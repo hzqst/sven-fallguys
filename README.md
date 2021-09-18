@@ -27,3 +27,8 @@ This map is currently under construction.
 
 * Linux is currently not supported yet, since Microsoft's Detours library is used in metamod to hook engine physics shit.
 
+# Credits
+
+Some textures, sprites and sounds credit to [Fall Guys: Ultimate Knockout](https://fallguys.com/)
+
+The skybox credits to [mg_falling_guy from CSGO workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=2428655418)
