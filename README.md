@@ -7,6 +7,8 @@ This map is currently under construction.
 
 ## Stage Select
 
+![](/img/stageselect.png)
+
 ## Block Party
 
 ![](/img/blockparty.png)
