@@ -33,6 +33,6 @@ This map is currently under construction.
 
 # Credits
 
-Some textures, sprites and sounds credit to [Fall Guys: Ultimate Knockout](https://fallguys.com/)
+Textures, sprites and sounds credit to [Fall Guys: Ultimate Knockout](https://fallguys.com/)
 
 The skybox credits to [mg_falling_guy from CSGO workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=2428655418)
