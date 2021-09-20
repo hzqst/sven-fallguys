@@ -1,41 +1,195 @@
+
+const int FL_ONGROUND = (1<<9);
 const int FL_BASEVELOCITY = (1<<22);
 
 class CFuncLever : ScriptBaseEntity
 {
+	float m_flInertia = 1.0;
+	float m_flLimitAngle = 80.0;
+	float m_flLimitBounceVelocity = 10.0;
+	float m_flLimitBounceFriction = 0.5;
+	float m_flReturnAngle = 45.0;
+	float m_flReturnForce = 0;
+
 	void Spawn()
 	{
 		self.pev.solid = SOLID_BSP;
 		self.pev.movetype = MOVETYPE_PUSH;
 
+		if ((self.pev.spawnflags & 1) == 1)
+			self.pev.movedir = Vector(0, 0, 1);
+		else if ((self.pev.spawnflags & 2) == 2)
+			self.pev.movedir = Vector(1, 0, 0);
+
 		g_EntityFuncs.SetModel( self, self.pev.model );
 		g_EntityFuncs.SetSize( self.pev, self.pev.mins, self.pev.maxs );
 		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+
+		NextThink(self.pev.ltime + 0.1, false);
+		SetThink(ThinkFunction(this.Spin));
 	}
 
 	bool KeyValue( const string & in szKey, const string & in szValue )
 	{
+		if(szKey == "inertia")
+			m_flInertia = atof(szValue);
+		if(szKey == "limitangle")
+			m_flLimitAngle = atof(szValue);
+		if(szKey == "limitbouncevelocity")
+			m_flLimitBounceVelocity = atof(szValue);
+		if(szKey == "limitbouncefriction")
+			m_flLimitBounceFriction = atof(szValue);
+		if(szKey == "returnangle")
+			m_flReturnAngle = atof(szValue);
+		if(szKey == "returnforce")
+			m_flReturnForce = atof(szValue);
 		return BaseClass.KeyValue( szKey, szValue );
 	}
-	
-	void Touch( CBaseEntity@ pOther )
+
+	void NextThink(float thinkTime, const bool alwaysThink)
 	{
-		if ( pOther is null || !pOther.IsPlayer() || !pOther.IsAlive())
-			return;
+		if (alwaysThink)
+			self.pev.flags |= FL_ALWAYSTHINK;
+		else
+			self.pev.flags &= ~FL_ALWAYSTHINK;
 
-		CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pOther);
-		Vector vForward = self.pev.angles;
-		Math.MakeVectors(vForward);
-		vForward = vForward.Normalize();
+		self.pev.nextthink = thinkTime;
+	}
 
-		Vector vecPush = vForward;
-		vecPush = vecPush * self.pev.speed;
+	void Spin()
+	{
+		//g_Game.AlertMessage( at_console, "My avel %1 %2 %3\n", self.pev.avelocity.x, self.pev.avelocity.y, self.pev.avelocity.z );
+		//g_Game.AlertMessage( at_console, "My angle %1 %2 %3\n", self.pev.angles.x, self.pev.angles.y, self.pev.angles.z );
 
-		if ((pPlayer.pev.flags & FL_BASEVELOCITY) == FL_BASEVELOCITY)
-			vecPush = vecPush + pPlayer.pev.basevelocity;
+		float flNumForce = 0;
+		float flMomentOfForceTotal = 0;
 
-		pPlayer.pev.basevelocity = vecPush;
-		pPlayer.pev.flags |= FL_BASEVELOCITY;
+		int iLimited = 0;
 
+		if ((self.pev.spawnflags & 1) == 1)
+		{
+			if(self.pev.angles.z > m_flLimitAngle)
+			{
+				if(self.pev.avelocity.z > m_flLimitBounceVelocity)
+					self.pev.avelocity.z *= -m_flLimitBounceFriction;
+				else
+					self.pev.avelocity.z = -m_flLimitBounceVelocity * m_flLimitBounceFriction;
+				iLimited = 1;
+			}
+			else if(self.pev.angles.z < -m_flLimitAngle)
+			{
+				if(self.pev.avelocity.z < -m_flLimitBounceVelocity)
+					self.pev.avelocity.z *= -m_flLimitBounceFriction;
+				else
+					self.pev.avelocity.z = m_flLimitBounceVelocity * m_flLimitBounceFriction;
+				iLimited = 2;
+			}
+			else if(self.pev.angles.z > m_flReturnAngle)
+			{
+				flNumForce += 1.0;
+				flMomentOfForceTotal -= m_flReturnForce;
+				iLimited = -1;
+			}
+			else if(self.pev.angles.z < -m_flReturnAngle)
+			{
+				flNumForce += 1.0;
+				flMomentOfForceTotal += m_flReturnForce;
+				iLimited = -2;
+			}
+		}
+		else if ((self.pev.spawnflags & 2) == 2)
+		{
+			if(self.pev.angles.x > m_flLimitAngle)
+			{
+				if(self.pev.avelocity.x > m_flLimitBounceVelocity)
+					self.pev.avelocity.x *= -m_flLimitBounceFriction;
+				else
+					self.pev.avelocity.x = -m_flLimitBounceVelocity * m_flLimitBounceFriction;
+				iLimited = 1;
+			}
+			else if(self.pev.angles.x < -m_flLimitAngle)
+			{
+				if(self.pev.avelocity.x < -m_flLimitBounceVelocity)
+					self.pev.avelocity.x *= -m_flLimitBounceFriction;
+				else
+					self.pev.avelocity.x = m_flLimitBounceVelocity * m_flLimitBounceFriction;
+				iLimited = 2;
+			}
+			else if(self.pev.angles.x > m_flReturnAngle)
+			{
+				flNumForce += 1.0;
+				flMomentOfForceTotal -= m_flReturnForce;
+				iLimited = -1;
+			}
+			else if(self.pev.angles.x < -m_flReturnAngle)
+			{
+				flNumForce += 1.0;
+				flMomentOfForceTotal += m_flReturnForce;
+				iLimited = -2;
+			}
+		}
+
+		if(iLimited <= 0)
+		{
+			for (int i = 0; i <= g_Engine.maxClients; i++)
+			{
+				CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
+				if(pPlayer !is null && pPlayer.IsAlive())
+				{
+					if((pPlayer.pev.flags & FL_ONGROUND) == FL_ONGROUND && (pPlayer.pev.groundentity is self.edict() ))
+					{
+						float flAngle = 0;
+						float flOffset = 0;
+						Vector v1 = pPlayer.pev.origin;
+						Vector v2 = self.pev.origin;
+						if ((self.pev.spawnflags & 1) == 1)
+						{
+							v1.x = v2.x;
+							v1.z -= pPlayer.pev.maxs.z;
+							flOffset = (v1-v2).Length();
+							flAngle = self.pev.angles.z;
+
+							if(v1.y > v2.y)
+								flOffset *= -1.0;
+						}
+						else if ((self.pev.spawnflags & 2) == 2)
+						{
+							v1.y = v2.y;
+							v1.z -= pPlayer.pev.maxs.z;
+							flOffset = (v1-v2).Length();
+							flAngle = self.pev.angles.x;
+
+							if(v1.x > v2.x)
+								flOffset *= -1.0;
+						}
+
+						float flGravity = 800;
+						float flAngleDiff = 90 - flAngle;
+						float flMomentOfForce = flGravity * flOffset * sin(flAngleDiff * 2 * 3.14159 / 360.0);
+						
+						flMomentOfForceTotal += flMomentOfForce;
+						flNumForce += 1.0;
+
+						//g_Game.AlertMessage( at_console, "Found %1 on me, flOffset %2, flAngleDiff %3, flMomentOfForce %4 %5\n", pPlayer.pev.netname, flOffset, flAngleDiff, flMomentOfForce, pPlayer.pev.maxs.z );
+					}
+				}
+			}
+		}
+
+		float flAngleAcc = 0;
+		if(flNumForce > 0)
+		{
+			flAngleAcc = (flMomentOfForceTotal / flNumForce) / m_flInertia;
+			self.pev.avelocity = self.pev.avelocity + self.pev.movedir * (flAngleAcc * g_Engine.frametime);
+
+			NextThink(self.pev.ltime + 0.1, true);
+			SetThink(ThinkFunction(this.Spin));
+		}
+		else
+		{
+			NextThink(self.pev.ltime + 0.1, false);
+			SetThink(ThinkFunction(this.Spin));
+		}
 	}
 }
 
@@ -99,8 +253,10 @@ class CTriggerHUDSprite : ScriptBaseEntity
 		return BaseClass.KeyValue( szKey, szValue );
 	}
 	
-	void SendCounter( CBasePlayer@ pPlayer, const string& in strName, uint framenum = 0, float hold = 0.8 )
+	void SendSprite( CBasePlayer@ pPlayer, const string& in strName, uint framenum = 0, float hold = 0.8 )
 	{
+		g_PlayerFuncs.HudToggleElement(pPlayer, m_iChannel, true);
+
 		HUDSpriteParams params;
 		params.channel = m_iChannel;
 		params.flags = HUD_SPR_MASKED; 
@@ -123,47 +279,72 @@ class CTriggerHUDSprite : ScriptBaseEntity
 
 	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
 	{
-		//g_Game.AlertMessage( at_console, "Activator is %1", pActivator.pev.netname );
-		//g_Game.AlertMessage( at_console, "Caller is %1", pCaller.pev.netname );
-
 		if(m_szSprName != "")
 		{
-			if(pActivator.IsPlayer() && pActivator.IsNetClient())
+			if(useType == USE_OFF)
 			{
-				CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pActivator);
-				if(pPlayer.IsConnected())
-					SendCounter(pPlayer, m_szSprName, m_nFrameNum, m_flHoldTime);
+				if(pActivator.IsPlayer() && pActivator.IsNetClient())
+				{
+					CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pActivator);
+					if(pPlayer.IsConnected())
+						g_PlayerFuncs.HudToggleElement(pPlayer, m_iChannel, false);
+				}
+				else
+				{
+					for (int i = 0; i <= g_Engine.maxClients; i++)
+					{
+						CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
+						if(pPlayer !is null && pPlayer.IsConnected())
+							g_PlayerFuncs.HudToggleElement(pPlayer, m_iChannel, false);
+					}
+				}
 			}
 			else
 			{
-				for (int i = 0; i <= g_Engine.maxClients; i++)
+				if(pActivator.IsPlayer() && pActivator.IsNetClient())
 				{
-					CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
-					if(pPlayer !is null && pPlayer.IsConnected())
-						SendCounter(pPlayer, m_szSprName, m_nFrameNum, m_flHoldTime);
+					CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pActivator);
+					if(pPlayer.IsConnected())
+						SendSprite(pPlayer, m_szSprName, m_nFrameNum, m_flHoldTime);
+				}
+				else
+				{
+					for (int i = 0; i <= g_Engine.maxClients; i++)
+					{
+						CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
+						if(pPlayer !is null && pPlayer.IsConnected())
+							SendSprite(pPlayer, m_szSprName, m_nFrameNum, m_flHoldTime);
+					}
 				}
 			}
 		}
 
 		if(m_szSoundName != "")
 		{
-			if(pActivator.IsPlayer() && pActivator.IsNetClient())
+			if(useType == USE_OFF)
 			{
-				CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pActivator);
-				NetworkMessage message( MSG_ONE, NetworkMessages::SVC_STUFFTEXT, pPlayer.edict() );
-					message.WriteString("spk " + m_szSoundName);
-				message.End();
+
 			}
 			else
 			{
-				for (int i = 0; i <= g_Engine.maxClients; i++)
+				if(pActivator.IsPlayer() && pActivator.IsNetClient())
 				{
-					CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
-					if(pPlayer !is null && pPlayer.IsConnected())
+					CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pActivator);
+					NetworkMessage message( MSG_ONE, NetworkMessages::SVC_STUFFTEXT, pPlayer.edict() );
+						message.WriteString("spk " + m_szSoundName);
+					message.End();
+				}
+				else
+				{
+					for (int i = 0; i <= g_Engine.maxClients; i++)
 					{
-						NetworkMessage message( MSG_ONE, NetworkMessages::SVC_STUFFTEXT, pPlayer.edict() );
-							message.WriteString("spk " + m_szSoundName);
-						message.End();
+						CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
+						if(pPlayer !is null && pPlayer.IsConnected())
+						{
+							NetworkMessage message( MSG_ONE, NetworkMessages::SVC_STUFFTEXT, pPlayer.edict() );
+								message.WriteString("spk " + m_szSoundName);
+							message.End();
+						}
 					}
 				}
 			}
@@ -213,6 +394,8 @@ class CTriggerHUDCountdown : ScriptBaseEntity
 
 	void SendCountdown( CBasePlayer@ pPlayer, float countnum = 0.0, float hold = 0.8 )
 	{
+		g_PlayerFuncs.HudToggleElement(pPlayer, m_iChannel, true);
+
 		HUDNumDisplayParams params;
 		params.channel = m_iChannel;
 		params.flags = HUD_TIME_MINUTES | HUD_TIME_SECONDS | HUD_TIME_COUNT_DOWN; 
@@ -230,6 +413,8 @@ class CTriggerHUDCountdown : ScriptBaseEntity
 		params.fadeoutTime = 0.2;
 
 		g_PlayerFuncs.HudTimeDisplay(pPlayer, params);
+
+		g_Game.AlertMessage( at_console, "Send Countdown to %1\n", pPlayer.pev.netname );
 	}
 
 	void UpdateCountdown( CBasePlayer@ pPlayer, float countnum = 0.0 )
@@ -262,14 +447,41 @@ class CTriggerHUDCountdown : ScriptBaseEntity
 
 	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
 	{
-		if(m_nCurrentCount == 0)
+		if(useType == USE_TOGGLE)
+		{
+			if(m_nCurrentCount == 0)
+			{
+				m_nCurrentCount = m_nCountNum;
+				m_nCurrentAccum = 0;
+				Think();
+			}
+			else
+			{
+				m_nCurrentCount = m_nCountNum;
+				m_nCurrentAccum = 0;
+				self.pev.nextthink = 0;
+			}
+		}
+		else if(useType == USE_ON)
 		{
 			m_nCurrentCount = m_nCountNum;
 			m_nCurrentAccum = 0;
 			Think();
 		}
-		else
+		else if(useType == USE_OFF)
 		{
+			if(m_nCurrentCount > 0)
+			{
+				for (int i = 0; i <= g_Engine.maxClients; i++)
+				{
+					CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
+					if(pPlayer !is null && pPlayer.IsConnected())
+					{
+						SendCountdown(pPlayer, 0, 0);
+					}
+				}
+			}
+
 			m_nCurrentCount = m_nCountNum;
 			m_nCurrentAccum = 0;
 			self.pev.nextthink = 0;
@@ -512,6 +724,70 @@ class CTriggerSortScore : ScriptBaseEntity
 	}
 }
 
+class CTriggerSurvival : ScriptBaseEntity
+{
+	int m_iOverrideState = 0;
+	//g_SurvivalMode.IsActive()
+
+	void Precache()
+	{
+		BaseClass.Precache();
+	}
+
+	void Spawn()
+	{
+		Precache();
+		self.pev.solid = SOLID_NOT;
+		self.pev.movetype = MOVETYPE_NONE;
+
+		g_EntityFuncs.SetModel( self, self.pev.model );
+		g_EntityFuncs.SetSize( self.pev, self.pev.mins, self.pev.maxs );
+		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+	}
+
+	bool KeyValue( const string & in szKey, const string & in szValue )
+	{
+		if(szKey == "override_state")
+			m_iOverrideState = atoi(szValue);
+
+		return BaseClass.KeyValue( szKey, szValue );
+	}
+	
+	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
+	{
+		if(m_iOverrideState == 1)
+		{
+			g_SurvivalMode.Activate();
+		}
+		else if(m_iOverrideState == 2)
+		{
+			g_SurvivalMode.Disable();
+		}
+		else
+		{
+			if(useType == USE_OFF)
+			{
+				g_SurvivalMode.Disable();
+			}
+			else if(useType == USE_ON)
+			{
+				g_SurvivalMode.Activate();
+			}
+			else if(useType == USE_TOGGLE)
+			{
+				g_SurvivalMode.Toggle();
+			}
+			else if(useType == USE_SET)
+			{
+				if(flValue > 0)
+					g_SurvivalMode.Activate();
+				else
+					g_SurvivalMode.Disable();
+			}
+		}
+	}
+}
+
 class CTriggerFindBrush : ScriptBaseEntity
 {
 	string m_szFilterClassName = "";
@@ -626,22 +902,65 @@ class CTriggerFreeze : ScriptBaseEntity
 
 	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
 	{
-		if((self.pev.spawnflags & 1) == 1)
+		if(useType == USE_TOGGLE)
 		{
-			self.pev.spawnflags &= ~1;
-			
-			for (int i = 0; i <= g_Engine.maxClients; i++)
+			if((self.pev.spawnflags & 1) == 1)
 			{
-				CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
-				if(pPlayer !is null && pPlayer.IsConnected())
+				self.pev.spawnflags &= ~1;
+				
+				for (int i = 0; i <= g_Engine.maxClients; i++)
 				{
-					pPlayer.SetMaxSpeedOverride(-1);
+					CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
+					if(pPlayer !is null && pPlayer.IsConnected())
+					{
+						pPlayer.SetMaxSpeedOverride(-1);
+					}
+				}
+			}
+			else
+			{
+				self.pev.spawnflags |= 1;
+			}
+		}
+		else if(useType == USE_ON)
+		{
+			self.pev.spawnflags |= 1;
+		}
+		else if(useType == USE_OFF)
+		{
+			if((self.pev.spawnflags & 1) == 1)
+			{
+				self.pev.spawnflags &= ~1;
+				
+				for (int i = 0; i <= g_Engine.maxClients; i++)
+				{
+					CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
+					if(pPlayer !is null && pPlayer.IsConnected())
+					{
+						pPlayer.SetMaxSpeedOverride(-1);
+					}
 				}
 			}
 		}
-		else
+		else if(useType == USE_SET)
 		{
-			self.pev.spawnflags |= 1;
+			if((self.pev.spawnflags & 1) == 1 && !(flValue > 0))
+			{
+				self.pev.spawnflags &= ~1;
+				
+				for (int i = 0; i <= g_Engine.maxClients; i++)
+				{
+					CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
+					if(pPlayer !is null && pPlayer.IsConnected())
+					{
+						pPlayer.SetMaxSpeedOverride(-1);
+					}
+				}
+			}
+			else if((self.pev.spawnflags & 1) != 1 && (flValue > 0))
+			{
+				self.pev.spawnflags |= 1;
+			}
 		}
 	}
 }
@@ -664,13 +983,14 @@ HookReturnCode Killed( CBasePlayer@ pPlayer, CBaseEntity@ pAttacker, int iGib )
 
 void MapInit()
 {	
-	//g_CustomEntityFuncs.RegisterCustomEntity( "CFuncLever", "func_lever" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncLever", "func_lever" );
 
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerHUDSprite", "trigger_hudsprite" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerHUDCountdown", "trigger_hudcountdown" );	
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerFreeze", "trigger_freeze" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerSortScore", "trigger_sortscore" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerFindBrush", "trigger_findbrush" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerSurvival", "trigger_survival" );
 	
 	g_Game.PrecacheGeneric( "sound/" + m_szEliminatedSndName );
 	
@@ -678,7 +998,7 @@ void MapInit()
 
 	g_SurvivalMode.EnableMapSupport();
 	g_SurvivalMode.SetDelayBeforeStart(0);
-	g_SurvivalMode.Activate();
+	g_SurvivalMode.Disable();
 }
 
 void PluginInit()

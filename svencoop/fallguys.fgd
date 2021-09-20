@@ -83,6 +83,16 @@
 	sound(sound) : "Sound"
 ]
 
+@PointClass base(Targetname) color(255 255 255) = trigger_survival : "Enable or disable survival mode at runtime"
+[
+	override_state(choices) : "Override State" : 0 =
+	[
+		0 : "Use trigger state"
+		1 : "Enable survival mode"
+		2 : "Disable survival mode"
+	]
+]
+
 @PointClass base(Targetname, Angles) color(255 255 255) = env_shadow_control : "Shadow Control"
 [
 	distfade(string) : "Distance Fade" : "64 128"
@@ -106,4 +116,21 @@
 	]
 	filter_classname(string) : "Filter Classname"
 	filter_targetname(string) : "Filter Targetname"
+]
+
+
+@SolidClass base(Targetname, ZHLTbmodel) color(255 255 255) = func_lever : "Lever"
+[
+	spawnflags(flags) =
+	[
+		1 : "X Axis" : 0
+		2 : "Y Axis" : 0
+	]
+
+	inertia(integer) : "Moment of inertia"
+	limitangle(integer) : "Limit of rotate angle"
+	limitbouncevelocity(integer) : "Bounce velocity when hit limit"
+	limitbouncefriction(integer) : "Bounce friction when hit limit"
+	returnangle(integer) : "Return back when hit limit"
+	returnforce(integer) : "Moment of force to return back"
 ]
