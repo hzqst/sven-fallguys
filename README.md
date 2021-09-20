@@ -17,6 +17,10 @@ This map is currently under construction.
 
 ![](/img/slimeclimb.png)
 
+## Seesaw
+
+![](/img/seesaw.png)
+
 ## Eliminated and Victory Board
 
 # Requirement
