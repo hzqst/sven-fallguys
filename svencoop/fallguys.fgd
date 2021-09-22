@@ -93,6 +93,16 @@
 	]
 ]
 
+@PointClass base(Targetname) color(255 255 255) = trigger_random_counter : "Generate random numbers"
+[
+	minvalue(integer) : "Minimum Number to generate"
+	maxvalue(integer) : "Maximum Number to generate"
+	spawnflags(Flags) =
+	[
+		1 : "Average Random" 	: 0
+	]
+]
+
 @PointClass base(Targetname, Angles) color(255 255 255) = env_shadow_control : "Shadow Control"
 [
 	distfade(string) : "Distance Fade" : "64 128"

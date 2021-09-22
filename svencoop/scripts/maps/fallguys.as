@@ -283,7 +283,7 @@ class CTriggerHUDSprite : ScriptBaseEntity
 		{
 			if(useType == USE_OFF)
 			{
-				if(pActivator.IsPlayer() && pActivator.IsNetClient())
+				if(pActivator !is null && pActivator.IsPlayer() && pActivator.IsNetClient())
 				{
 					CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pActivator);
 					if(pPlayer.IsConnected())
@@ -301,7 +301,7 @@ class CTriggerHUDSprite : ScriptBaseEntity
 			}
 			else
 			{
-				if(pActivator.IsPlayer() && pActivator.IsNetClient())
+				if(pActivator !is null && pActivator.IsPlayer() && pActivator.IsNetClient())
 				{
 					CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pActivator);
 					if(pPlayer.IsConnected())
@@ -327,7 +327,7 @@ class CTriggerHUDSprite : ScriptBaseEntity
 			}
 			else
 			{
-				if(pActivator.IsPlayer() && pActivator.IsNetClient())
+				if(pActivator !is null && pActivator.IsPlayer() && pActivator.IsNetClient())
 				{
 					CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pActivator);
 					NetworkMessage message( MSG_ONE, NetworkMessages::SVC_STUFFTEXT, pPlayer.edict() );
@@ -414,7 +414,7 @@ class CTriggerHUDCountdown : ScriptBaseEntity
 
 		g_PlayerFuncs.HudTimeDisplay(pPlayer, params);
 
-		g_Game.AlertMessage( at_console, "Send Countdown to %1\n", pPlayer.pev.netname );
+		//g_Game.AlertMessage( at_console, "Send Countdown to %1\n", pPlayer.pev.netname );
 	}
 
 	void UpdateCountdown( CBasePlayer@ pPlayer, float countnum = 0.0 )
@@ -724,10 +724,83 @@ class CTriggerSortScore : ScriptBaseEntity
 	}
 }
 
+class CTriggerRandomCounter : ScriptBaseEntity
+{
+	int m_iMinValue = 0;
+	int m_iMaxValue = 1;
+	array<string> m_szTargetArray = {};
+
+	void Precache()
+	{
+		BaseClass.Precache();
+	}
+
+	void Spawn()
+	{
+		Precache();
+		self.pev.solid = SOLID_NOT;
+		self.pev.movetype = MOVETYPE_NONE;
+
+		g_EntityFuncs.SetModel( self, self.pev.model );
+		g_EntityFuncs.SetSize( self.pev, self.pev.mins, self.pev.maxs );
+		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+	}
+
+	bool KeyValue( const string & in szKey, const string & in szValue )
+	{	
+		if(szKey == "minvalue")
+			m_iMinValue = atoi(szValue);
+
+		if(szKey == "maxvalue")
+			m_iMaxValue = atoi(szValue);
+
+		if(szKey.StartsWith("target") && szKey != "targetname")
+		{
+			m_szTargetArray.insertLast(szValue);
+		}
+	
+		return BaseClass.KeyValue( szKey, szValue );
+	}
+
+	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
+	{
+		if((self.pev.spawnflags & 1) == 1)
+		{
+			array<int> rnd( m_szTargetArray.length() );
+
+			for (int i = 0; i < int(m_szTargetArray.length()); i++)
+			{
+				rnd[i] = (i % (1 + m_iMaxValue - m_iMinValue)) + m_iMinValue;
+			}
+
+			for (int i = int(m_szTargetArray.length()) - 1; i >= 0; i --) {
+				int randomIndex = g_PlayerFuncs.SharedRandomLong( uint(g_Engine.time) + i, 0, i );//Math.RandomLong(0, i);
+				int temp = rnd[randomIndex];
+				rnd[randomIndex] = rnd[i];
+				rnd[i] = temp;
+			}
+
+			for (int i = 0; i < int(m_szTargetArray.length()); i++)
+			{
+				g_EntityFuncs.FireTargets( m_szTargetArray[i], self, self, USE_SET, float(rnd[i]) );
+				g_Game.AlertMessage( at_console, "SetAverage %1 to %2\n", m_szTargetArray[i], float(rnd[i]) );
+			}
+		}
+		else
+		{
+			for (int i = 0; i < int(m_szTargetArray.length()); i++)
+			{
+				int rnd = g_PlayerFuncs.SharedRandomLong( uint(g_Engine.time) + i, m_iMinValue, m_iMaxValue );
+				g_EntityFuncs.FireTargets( m_szTargetArray[i], self, self, USE_SET, float(rnd) );
+				g_Game.AlertMessage( at_console, "Set %1 to %2\n", m_szTargetArray[i], float(rnd) );
+			}
+		}
+	}
+}
+
 class CTriggerSurvival : ScriptBaseEntity
 {
 	int m_iOverrideState = 0;
-	//g_SurvivalMode.IsActive()
 
 	void Precache()
 	{
@@ -757,7 +830,7 @@ class CTriggerSurvival : ScriptBaseEntity
 	{
 		if(m_iOverrideState == 1)
 		{
-			g_SurvivalMode.Activate();
+			g_SurvivalMode.Activate(true);
 		}
 		else if(m_iOverrideState == 2)
 		{
@@ -984,21 +1057,22 @@ HookReturnCode Killed( CBasePlayer@ pPlayer, CBaseEntity@ pAttacker, int iGib )
 void MapInit()
 {	
 	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncLever", "func_lever" );
-
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerHUDSprite", "trigger_hudsprite" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerHUDCountdown", "trigger_hudcountdown" );	
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerFreeze", "trigger_freeze" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerSortScore", "trigger_sortscore" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerRandomCounter", "trigger_random_counter" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerFindBrush", "trigger_findbrush" );
-	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerSurvival", "trigger_survival" );
+	//g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerSurvival", "trigger_survival" );
 	
 	g_Game.PrecacheGeneric( "sound/" + m_szEliminatedSndName );
 	
 	g_Hooks.RegisterHook(Hooks::Player::PlayerKilled, @Killed);
 
-	g_SurvivalMode.EnableMapSupport();
-	g_SurvivalMode.SetDelayBeforeStart(0);
-	g_SurvivalMode.Disable();
+	//g_SurvivalMode.EnableMapSupport();
+	//g_SurvivalMode.SetDelayBeforeStart(0);
+	//g_SurvivalMode.SetStartOn(false);
+	//g_SurvivalMode.Disable();
 }
 
 void PluginInit()
