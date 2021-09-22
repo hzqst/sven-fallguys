@@ -32,9 +32,11 @@ This map is currently under construction.
 
 # Requirement
 
-1. Sven Co-op Client or Sven Co-op Dedicated Server 5.25 or later for Windows
+1. Sven Co-op Client or Sven Co-op Dedicated Server 5.25 or later
 
-2. metamod-p (Already included in this repository)
+# Optional
+
+1. metamod-p (Already included in this repository, for physic-engine enhancement)
 
 * Linux is currently not supported yet, since Microsoft's Detours library is used in metamod to hook engine physics shit.
 
