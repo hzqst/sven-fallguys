@@ -83,25 +83,31 @@
 	sound(sound) : "Sound"
 ]
 
-@PointClass base(Targetname) color(255 255 255) = trigger_survival : "Enable or disable survival mode at runtime"
-[
-	override_state(choices) : "Override State" : 0 =
-	[
-		0 : "Use trigger state"
-		1 : "Enable survival mode"
-		2 : "Disable survival mode"
-	]
-]
-
 @PointClass base(Targetname) color(255 255 255) = trigger_random_counter : "Generate random numbers"
 [
-	minvalue(integer) : "Minimum Number to generate"
-	maxvalue(integer) : "Maximum Number to generate"
+	minvalue(integer) : "Minimum number to generate"
+	maxvalue(integer) : "Maximum number to generate"
 	spawnflags(Flags) =
 	[
 		1 : "Average Random" 	: 0
 	]
 ]
+
+@PointClass base(Targetname) color(255 255 255) = trigger_random_multiple : "Trigger multiple randoms"
+[
+	mincount(integer) : "Minimum count to trigger"
+	maxcount(integer) : "Maximum count to trigger"
+]
+
+@PointClass base(Targetname) color(255 255 255) = trigger_respawn_unstuck : "Teleport player to unstucked spawnpoint"
+[
+]
+
+@PointClass base(Targetname, Target) color(255 255 255) = trigger_rot_control : "Control func_rotating"
+[
+	newspeed(integer) : "New speed to rotate"
+]
+
 
 @PointClass base(Targetname, Angles) color(255 255 255) = env_shadow_control : "Shadow Control"
 [
@@ -127,7 +133,6 @@
 	filter_classname(string) : "Filter Classname"
 	filter_targetname(string) : "Filter Targetname"
 ]
-
 
 @SolidClass base(Targetname, ZHLTbmodel) color(255 255 255) = func_lever : "Lever"
 [

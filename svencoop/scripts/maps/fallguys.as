@@ -1,6 +1,7 @@
 
 const int FL_ONGROUND = (1<<9);
 const int FL_BASEVELOCITY = (1<<22);
+const int SF_BRUSH_ACCDCC = 16;
 
 class CFuncLever : ScriptBaseEntity
 {
@@ -495,8 +496,8 @@ class CTriggerSortScore : ScriptBaseEntity
 	float m_flTriggerDelay = 0;
 	string m_szFinalTarget = "";
 	string m_szPitchSound = "";
-	float m_flBasePitch = 100.0;
-	float m_flAddPitch = 10.0;
+	int m_iBasePitch = 100.0;
+	int m_iAddPitch = 0.0;
 
 	int m_iLastTriggerPlayerIndex = 0;
 	int m_iTriggerPlayerCount = 0;
@@ -506,6 +507,9 @@ class CTriggerSortScore : ScriptBaseEntity
 	void Precache()
 	{
 		BaseClass.Precache();
+		
+		g_Game.PrecacheGeneric( "sound/" + m_szPitchSound );
+		g_SoundSystem.PrecacheSound( m_szPitchSound );
 	}
 
 	void Spawn()
@@ -530,9 +534,9 @@ class CTriggerSortScore : ScriptBaseEntity
 		if(szKey == "pitchsound")
 			m_szPitchSound = szValue;
 		if(szKey == "basepitch")
-			m_flBasePitch = atof(szValue);
+			m_iBasePitch = atoi(szValue);
 		if(szKey == "addpitch")
-			m_flAddPitch = atof(szValue);
+			m_iAddPitch = atoi(szValue);
 
 		return BaseClass.KeyValue( szKey, szValue );
 	}
@@ -552,10 +556,13 @@ class CTriggerSortScore : ScriptBaseEntity
 						g_EntityFuncs.FireTargets( self.pev.target, cast<CBaseEntity@>(@pPlayer), self, m_iLastUseType );
 
 						if(m_szPitchSound != ""){
-							float flPitch = (m_flBasePitch + m_iTriggerPlayerCount * m_flAddPitch) * 100.0 / 255.0;
-							if(flPitch > 1.0)
-								flPitch = 1.0;
-							g_EntityFuncs.FireTargets( m_szPitchSound, cast<CBaseEntity@>(@pPlayer), self, USE_SET, flPitch);
+							int iPitch = (m_iBasePitch + m_iTriggerPlayerCount * m_iAddPitch);
+							if(iPitch > 255)
+								iPitch = 255;
+							if(iPitch < 50)
+								iPitch = 50;
+							g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_STATIC, m_szPitchSound, 1.0, 0.01, 0, iPitch );
+							//g_EntityFuncs.FireTargets( m_szPitchSound, cast<CBaseEntity@>(@pPlayer), self, USE_SET, flPitch);
 						}
 
 						//g_Game.AlertMessage( at_console, "Trigger player %1\n", pPlayer.pev.netname );
@@ -572,10 +579,13 @@ class CTriggerSortScore : ScriptBaseEntity
 						g_EntityFuncs.FireTargets( self.pev.target, cast<CBaseEntity@>(@pPlayer), self, m_iLastUseType );
 						
 						if(m_szPitchSound != ""){
-							float flPitch = (m_flBasePitch + m_iTriggerPlayerCount * m_flAddPitch) * 100.0 / 255.0;
-							if(flPitch > 1.0)
-								flPitch = 1.0;
-							g_EntityFuncs.FireTargets( m_szPitchSound, cast<CBaseEntity@>(@pPlayer), self, USE_SET, flPitch);
+							int iPitch = (m_iBasePitch + m_iTriggerPlayerCount * m_iAddPitch);
+							if(iPitch > 255)
+								iPitch = 255;
+							if(iPitch < 50)
+								iPitch = 50;
+							g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_STATIC, m_szPitchSound, 1.0, 0.01, 0, iPitch );
+							//g_EntityFuncs.FireTargets( m_szPitchSound, cast<CBaseEntity@>(@pPlayer), self, USE_SET, flPitch);
 						}
 
 						m_iLastTriggerPlayerIndex = i;
@@ -639,16 +649,19 @@ class CTriggerSortScore : ScriptBaseEntity
 							g_EntityFuncs.FireTargets( self.pev.target, cast<CBaseEntity@>(@pPlayer), self, useType );
 
 							if(m_szPitchSound != ""){
-								float flPitch = (m_flBasePitch + m_iTriggerPlayerCount * m_flAddPitch) * 100.0 / 255.0;
-								if(flPitch > 1.0)
-									flPitch = 1.0;
-								g_EntityFuncs.FireTargets( m_szPitchSound, cast<CBaseEntity@>(@pPlayer), self, USE_SET, flPitch);
+								int iPitch = (m_iBasePitch + m_iTriggerPlayerCount * m_iAddPitch);
+								if(iPitch > 255)
+									iPitch = 255;
+								if(iPitch < 50)
+									iPitch = 50;
+								g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_STATIC, m_szPitchSound, 1.0, 0.01, 0, iPitch );
+								//g_EntityFuncs.FireTargets( m_szPitchSound, cast<CBaseEntity@>(@pPlayer), self, USE_SET, flPitch);
 							}
 							
 							m_iLastTriggerPlayerIndex = i;
 							m_iTriggerPlayerCount ++;
 
-							g_Game.AlertMessage( at_console, "Trigger player %1\n", pPlayer.pev.netname );
+							//g_Game.AlertMessage( at_console, "Trigger player %1\n", pPlayer.pev.netname );
 
 							if(m_flTriggerDelay > 0){
 								bHasNext = true;
@@ -697,10 +710,13 @@ class CTriggerSortScore : ScriptBaseEntity
 							g_EntityFuncs.FireTargets( self.pev.target, cast<CBaseEntity@>(@pPlayer), self, useType );
 							
 							if(m_szPitchSound != ""){
-								float flPitch = (m_flBasePitch + m_iTriggerPlayerCount * m_flAddPitch) * 100.0 / 255.0;
-								if(flPitch > 1.0)
-									flPitch = 1.0;
-								g_EntityFuncs.FireTargets( m_szPitchSound, cast<CBaseEntity@>(@pPlayer), self, USE_SET, flPitch);
+								int iPitch = (m_iBasePitch + m_iTriggerPlayerCount * m_iAddPitch);
+								if(iPitch > 255)
+									iPitch = 255;
+								if(iPitch < 50)
+									iPitch = 50;
+								g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_STATIC, m_szPitchSound, 1.0, 0.01, 0, iPitch );
+								//g_EntityFuncs.FireTargets( m_szPitchSound, cast<CBaseEntity@>(@pPlayer), self, USE_SET, flPitch);
 							}
 
 							m_iLastTriggerPlayerIndex = i;
@@ -718,6 +734,146 @@ class CTriggerSortScore : ScriptBaseEntity
 				if(!bHasNext && m_szFinalTarget != "")
 				{
 					g_EntityFuncs.FireTargets( m_szFinalTarget, self, self, useType );
+				}
+			}
+		}
+	}
+}
+
+class CTriggerRespawnUnstuck : ScriptBaseEntity
+{
+	void Precache()
+	{
+		BaseClass.Precache();
+	}
+
+	void Spawn()
+	{
+		Precache();
+		self.pev.solid = SOLID_NOT;
+		self.pev.movetype = MOVETYPE_NONE;
+
+		g_EntityFuncs.SetModel( self, self.pev.model );
+		g_EntityFuncs.SetSize( self.pev, self.pev.mins, self.pev.maxs );
+		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+	}
+
+	bool KeyValue( const string & in szKey, const string & in szValue )
+	{	
+		return BaseClass.KeyValue( szKey, szValue );
+	}
+
+	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
+	{
+		g_PlayerFuncs.RespawnAllPlayers(true, true);
+
+		for (int i = 0; i <= g_Engine.maxClients; i++)
+		{
+			CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
+			if(pPlayer !is null && pPlayer.IsAlive())
+			{
+				CBaseEntity@ pEntity = null;
+				while((@pEntity = g_EntityFuncs.FindEntityByClassname(pEntity, "info_player_deathmatch")) !is null)
+				{
+					if(g_PlayerFuncs.IsSpawnPointValid(pEntity, pPlayer) && !g_PlayerFuncs.IsSpawnPointOccupied(pEntity))
+					{
+						g_Game.AlertMessage( at_console, "Teleport player to unoccupied\n" );
+						g_EntityFuncs.SetOrigin(pPlayer, pEntity.pev.origin);
+						break;
+					}
+				}
+			}
+		}
+	}
+}
+
+class CTriggerRotControl : ScriptBaseEntity
+{
+	float m_flNewSpeed = 0;
+
+	void Precache()
+	{
+		BaseClass.Precache();
+	}
+
+	void Spawn()
+	{
+		Precache();
+		self.pev.solid = SOLID_NOT;
+		self.pev.movetype = MOVETYPE_NONE;
+
+		g_EntityFuncs.SetModel( self, self.pev.model );
+		g_EntityFuncs.SetSize( self.pev, self.pev.mins, self.pev.maxs );
+		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+	}
+
+	bool KeyValue( const string & in szKey, const string & in szValue )
+	{	
+		if(szKey == "newspeed")
+			m_flNewSpeed = atof(szValue);
+
+		return BaseClass.KeyValue( szKey, szValue );
+	}
+
+	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
+	{
+		//g_Game.AlertMessage( at_console, "Accelerating by %1, %2\n", self.pev.targetname, self.pev.target);
+
+		if(useType == USE_TOGGLE || useType == USE_ON)
+		{
+			CBaseEntity@ pTarget = g_EntityFuncs.FindEntityByTargetname(null, self.pev.target);
+			if(pTarget !is null)
+			{
+				if((pTarget.pev.spawnflags & SF_BRUSH_ACCDCC) == 0)
+				{
+					pTarget.pev.spawnflags |= SF_BRUSH_ACCDCC;
+					pTarget.pev.speed = m_flNewSpeed;
+
+					Vector saved_avelocity = pTarget.pev.avelocity;
+					pTarget.pev.avelocity = Vector(0, 0, 0);
+					
+					g_Game.AlertMessage( at_console, "Accelerating for %1!\n", pTarget.pev.targetname);
+
+					g_EntityFuncs.FireTargets( self.pev.target, self, self, USE_ON, flValue );
+
+					pTarget.pev.avelocity = saved_avelocity;
+					pTarget.pev.spawnflags &= ~SF_BRUSH_ACCDCC;
+				}
+				else
+				{
+					pTarget.pev.speed = m_flNewSpeed;
+
+					Vector saved_avelocity = pTarget.pev.avelocity;
+					pTarget.pev.avelocity = Vector(0, 0, 0);
+					
+					g_Game.AlertMessage( at_console, "Accelerating for %1!\n", pTarget.pev.targetname);
+
+					g_EntityFuncs.FireTargets( self.pev.target, self, self, USE_ON, flValue );
+
+					pTarget.pev.avelocity = saved_avelocity;
+				}
+			}
+		}
+		else if(useType == USE_OFF)
+		{
+			CBaseEntity@ pTarget = g_EntityFuncs.FindEntityByTargetname(null, self.pev.target);
+			if(pTarget !is null)
+			{
+				if((pTarget.pev.spawnflags & SF_BRUSH_ACCDCC) == 0)
+				{
+					pTarget.pev.spawnflags |= SF_BRUSH_ACCDCC;
+					pTarget.pev.speed = pTarget.pev.frags;
+					pTarget.pev.angles = Vector(0, 0, 0);
+					g_EntityFuncs.FireTargets( self.pev.target, self, self, USE_OFF, flValue );
+
+					pTarget.pev.spawnflags &= ~SF_BRUSH_ACCDCC;
+				}
+				else
+				{
+					pTarget.pev.speed = pTarget.pev.frags;
+					pTarget.pev.angles = Vector(0, 0, 0);
+
+					g_EntityFuncs.FireTargets( self.pev.target, self, self, USE_OFF, flValue );
 				}
 			}
 		}
@@ -783,7 +939,7 @@ class CTriggerRandomCounter : ScriptBaseEntity
 			for (int i = 0; i < int(m_szTargetArray.length()); i++)
 			{
 				g_EntityFuncs.FireTargets( m_szTargetArray[i], self, self, USE_SET, float(rnd[i]) );
-				g_Game.AlertMessage( at_console, "SetAverage %1 to %2\n", m_szTargetArray[i], float(rnd[i]) );
+				//g_Game.AlertMessage( at_console, "SetAverage %1 to %2\n", m_szTargetArray[i], float(rnd[i]) );
 			}
 		}
 		else
@@ -792,15 +948,17 @@ class CTriggerRandomCounter : ScriptBaseEntity
 			{
 				int rnd = g_PlayerFuncs.SharedRandomLong( uint(g_Engine.time) + i, m_iMinValue, m_iMaxValue );
 				g_EntityFuncs.FireTargets( m_szTargetArray[i], self, self, USE_SET, float(rnd) );
-				g_Game.AlertMessage( at_console, "Set %1 to %2\n", m_szTargetArray[i], float(rnd) );
+				//g_Game.AlertMessage( at_console, "Set %1 to %2\n", m_szTargetArray[i], float(rnd) );
 			}
 		}
 	}
 }
 
-class CTriggerSurvival : ScriptBaseEntity
+class CTriggerRandomMultiple : ScriptBaseEntity
 {
-	int m_iOverrideState = 0;
+	int m_iMinCount = 0;
+	int m_iMaxCount = 1;
+	array<string> m_szTargetArray = {};
 
 	void Precache()
 	{
@@ -819,47 +977,47 @@ class CTriggerSurvival : ScriptBaseEntity
 	}
 
 	bool KeyValue( const string & in szKey, const string & in szValue )
-	{
-		if(szKey == "override_state")
-			m_iOverrideState = atoi(szValue);
+	{	
+		if(szKey == "mincount")
+			m_iMinCount = atoi(szValue);
 
+		if(szKey == "maxcount")
+			m_iMaxCount = atoi(szValue);
+
+		if(szKey.StartsWith("target") && szKey != "targetname"&& szKey != "target_count")
+		{
+			m_szTargetArray.insertLast(szValue);
+		}
+	
 		return BaseClass.KeyValue( szKey, szValue );
 	}
-	
+
 	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
 	{
-		if(m_iOverrideState == 1)
+		array<int> rnd( m_szTargetArray.length() );
+
+		for (int i = 0; i < int(m_szTargetArray.length()); i++)
 		{
-			g_SurvivalMode.Activate(true);
+			rnd[i] = i;
 		}
-		else if(m_iOverrideState == 2)
-		{
-			g_SurvivalMode.Disable();
+
+		for (int i = int(m_szTargetArray.length()) - 1; i >= 0; i --) {
+			int randomIndex = g_PlayerFuncs.SharedRandomLong( uint(g_Engine.time) + i, 0, i );//Math.RandomLong(0, i);
+			int temp = rnd[randomIndex];
+			rnd[randomIndex] = rnd[i];
+			rnd[i] = temp;
 		}
-		else
+
+		int count = g_PlayerFuncs.SharedRandomLong( uint(g_Engine.time), m_iMinCount, m_iMaxCount );
+
+		for (int i = 0; i < count; i++)
 		{
-			if(useType == USE_OFF)
-			{
-				g_SurvivalMode.Disable();
-			}
-			else if(useType == USE_ON)
-			{
-				g_SurvivalMode.Activate();
-			}
-			else if(useType == USE_TOGGLE)
-			{
-				g_SurvivalMode.Toggle();
-			}
-			else if(useType == USE_SET)
-			{
-				if(flValue > 0)
-					g_SurvivalMode.Activate();
-				else
-					g_SurvivalMode.Disable();
-			}
+			g_EntityFuncs.FireTargets( m_szTargetArray[rnd[i]], self, self, useType, flValue );
+			g_Game.AlertMessage( at_console, "TriggerRandom %1\n", m_szTargetArray[rnd[i]] );
 		}
 	}
 }
+
 
 class CTriggerFindBrush : ScriptBaseEntity
 {
@@ -1054,25 +1212,38 @@ HookReturnCode Killed( CBasePlayer@ pPlayer, CBaseEntity@ pAttacker, int iGib )
     return HOOK_HANDLED;
 }
 
+HookReturnCode PlayerSpawn(CBasePlayer@ pPlayer)
+{
+    if(pPlayer is null || !pPlayer.IsNetClient())
+        return HOOK_CONTINUE;
+
+	NetworkMessage message( MSG_ONE, NetworkMessages::SVC_STUFFTEXT, pPlayer.edict() );
+		message.WriteString("thirdperson");
+	message.End();
+
+    return HOOK_CONTINUE;
+}
+
 void MapInit()
-{	
-	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncLever", "func_lever" );
+{
+	//Point entity
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerHUDSprite", "trigger_hudsprite" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerHUDCountdown", "trigger_hudcountdown" );	
-	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerFreeze", "trigger_freeze" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerRespawnUnstuck", "trigger_respawn_unstuck" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerRotControl", "trigger_rot_control" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerSortScore", "trigger_sortscore" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerRandomCounter", "trigger_random_counter" );
-	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerFindBrush", "trigger_findbrush" );
-	//g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerSurvival", "trigger_survival" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerRandomMultiple", "trigger_random_multiple" );
 	
+	//Solid entity
+	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncLever", "func_lever" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerFreeze", "trigger_freeze" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerFindBrush", "trigger_findbrush" );
+
 	g_Game.PrecacheGeneric( "sound/" + m_szEliminatedSndName );
 	
 	g_Hooks.RegisterHook(Hooks::Player::PlayerKilled, @Killed);
-
-	//g_SurvivalMode.EnableMapSupport();
-	//g_SurvivalMode.SetDelayBeforeStart(0);
-	//g_SurvivalMode.SetStartOn(false);
-	//g_SurvivalMode.Disable();
+	g_Hooks.RegisterHook(Hooks::Player::PlayerSpawn, @PlayerSpawn);
 }
 
 void PluginInit()
