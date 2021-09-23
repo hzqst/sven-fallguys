@@ -26,6 +26,10 @@ This map is currently under construction.
 
 ![](/img/matchfall.png)
 
+## Jump Club
+
+![](/img/jumpclub.png)
+
 ## Eliminated and Victory Board
 
 ![](/img/end.png)
