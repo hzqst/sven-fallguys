@@ -26,17 +26,23 @@ This map is currently under construction.
 
 ![](/img/matchfall.png)
 
+## Jump Club
+
+![](/img/jumpclub.png)
+
 ## Eliminated and Victory Board
 
 ![](/img/end.png)
 
 # Requirement
 
-1. Sven Co-op Client or Sven Co-op Dedicated Server 5.25 or later
+1. Sven Co-op 5.25 or later
 
 # Optional
 
-1. metamod-p (Already included in this repository, for physic-engine enhancement)
+1. metamod plugin (Already included in this repository) for physic-engine enhancement
+
+Source code is available [here](https://github.com/hzqst/metamod-fallguys)
 
 * Linux is currently not supported yet, since Microsoft's Detours library is used in metamod to hook engine physics shit.
 
