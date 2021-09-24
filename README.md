@@ -30,6 +30,10 @@ This map is currently under construction.
 
 ![](/img/jumpclub.png)
 
+## Roll Out
+
+![](/img/rollout.png)
+
 ## Eliminated and Victory Board
 
 ![](/img/end.png)
