@@ -817,7 +817,7 @@ class CTriggerRotControl : ScriptBaseEntity
 
 	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
 	{
-		//g_Game.AlertMessage( at_console, "Accelerating by %1, %2\n", self.pev.targetname, self.pev.target);
+		//g_Game.AlertMessage( at_console, "Accelerating by %1, target %2\n", self.pev.targetname, self.pev.target);
 
 		if(useType == USE_TOGGLE || useType == USE_ON)
 		{
@@ -832,7 +832,7 @@ class CTriggerRotControl : ScriptBaseEntity
 					Vector saved_avelocity = pTarget.pev.avelocity;
 					pTarget.pev.avelocity = Vector(0, 0, 0);
 					
-					g_Game.AlertMessage( at_console, "Accelerating for %1!\n", pTarget.pev.targetname);
+					//g_Game.AlertMessage( at_console, "Accelerating for %1!\n", pTarget.pev.targetname);
 
 					g_EntityFuncs.FireTargets( self.pev.target, self, self, USE_ON, flValue );
 
@@ -846,7 +846,7 @@ class CTriggerRotControl : ScriptBaseEntity
 					Vector saved_avelocity = pTarget.pev.avelocity;
 					pTarget.pev.avelocity = Vector(0, 0, 0);
 					
-					g_Game.AlertMessage( at_console, "Accelerating for %1!\n", pTarget.pev.targetname);
+					//g_Game.AlertMessage( at_console, "Accelerating for %1!\n", pTarget.pev.targetname);
 
 					g_EntityFuncs.FireTargets( self.pev.target, self, self, USE_ON, flValue );
 
