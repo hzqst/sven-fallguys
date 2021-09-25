@@ -165,6 +165,7 @@ class CFuncLever : ScriptBaseEntity
 						}
 
 						float flGravity = 800;
+
 						float flAngleDiff = 90 - flAngle;
 						float flMomentOfForce = flGravity * flOffset * sin(flAngleDiff * 2 * 3.14159 / 360.0);
 						
@@ -763,23 +764,43 @@ class CTriggerRespawnUnstuck : ScriptBaseEntity
 		return BaseClass.KeyValue( szKey, szValue );
 	}
 
+	int GetPlayerCountInBox(Vector origin)
+	{
+		Vector vecAbsMin = origin;
+		Vector vecAbsMax = origin;
+
+		vecAbsMin.x -= 16;
+		vecAbsMin.y -= 16;
+		vecAbsMin.z -= 32;
+		vecAbsMax.x += 16;
+		vecAbsMax.y += 16;
+		vecAbsMax.z += 32;
+
+		array<CBaseEntity@> players( 33 );
+		return g_EntityFuncs.EntitiesInBox( @players, vecAbsMin, vecAbsMax, FL_CLIENT );
+	}
+
 	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
 	{
-		g_PlayerFuncs.RespawnAllPlayers(true, true);
-
 		for (int i = 0; i <= g_Engine.maxClients; i++)
 		{
 			CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
 			if(pPlayer !is null && pPlayer.IsAlive())
 			{
-				CBaseEntity@ pEntity = null;
-				while((@pEntity = g_EntityFuncs.FindEntityByClassname(pEntity, "info_player_deathmatch")) !is null)
+				if(GetPlayerCountInBox(pPlayer.pev.origin) > 1)
 				{
-					if(g_PlayerFuncs.IsSpawnPointValid(pEntity, pPlayer) && !g_PlayerFuncs.IsSpawnPointOccupied(pEntity))
+					g_Game.AlertMessage( at_console, "%1 is stucked with others\n", pPlayer.pev.netname );
+
+					CBaseEntity@ pEntity = null;
+					while((@pEntity = g_EntityFuncs.FindEntityByClassname(pEntity, "info_player_deathmatch")) !is null)
 					{
-						g_Game.AlertMessage( at_console, "Teleport player to unoccupied\n" );
-						g_EntityFuncs.SetOrigin(pPlayer, pEntity.pev.origin);
-						break;
+						if(g_PlayerFuncs.IsSpawnPointValid(pEntity, pPlayer) &&
+							GetPlayerCountInBox(pEntity.pev.origin) == 0)
+						{
+							g_Game.AlertMessage( at_console, "Teleport %1 to unoccupied spawnpoint\n", pPlayer.pev.netname );
+							g_EntityFuncs.SetOrigin(pPlayer, pEntity.pev.origin);
+							break;
+						}
 					}
 				}
 			}
