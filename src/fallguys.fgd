@@ -1,0 +1,165 @@
+@BaseClass = Angles
+[
+	angles(string) : "Pitch Yaw Roll (X Y Z)" : "0 0 0"
+]
+
+@BaseClass base(Mandatory) = Targetname
+[
+	targetname(target_source) : "Name"
+]
+
+@BaseClass = Target
+[
+	target(target_destination) : "Target"
+]
+
+@BaseClass = ZHLTbmodel
+[
+	zhlt_usemodel(string) : "ZHLT Template Model Target"
+	zhlt_copylight(string) : "ZHLT Copy Lighting From Target"
+	zhlt_noclip(choices) : "ZHLT Disable Clipping" : 0 =
+	[
+		0 : "Default"
+		1 : "Always non-solid"
+	]
+	zhlt_invisible(choices) : "ZHLT Invisible" : 0 =
+	[
+		0 : "Visible (default)"
+		1 : "Invisible"
+	]
+	zhlt_customshadow(string) : "ZHLT Custom Shadow (when opaque)"
+	zhlt_embedlightmap(choices) : "ZHLT Embed Light Map (when translucent)" : 0 =
+	[
+		0 : "No (default)"
+		1 : "Yes"
+	]
+	zhlt_embedlightmapresolution(integer) : "ZHLT Embed Light Map Resolution" : 4
+]
+
+@PointClass base(Targetname, Target) color(255 255 255) = trigger_sortscore : "Sort Player Score"
+[
+	sorttype(choices) : "Score Type" : 0 =
+	[
+		0 : "Players with highest scores"
+		1 : "Players not with highest scores"
+		2 : "Players with lowest scores"
+		3 : "Players not with lowest scores"
+	]
+	delay(integer) : "Delay between each triggers" : 0
+	finaltarget(target_destination) : "Trigger target entity after all processed" : 0
+]
+
+@PointClass base(Targetname) color(255 255 255) = trigger_hudcountdown : "HUD Countdown Timer"
+[
+	spawnflags(flags) =
+	[
+		1 : "Center X" : 0
+		2 : "Center Y" : 0
+	]
+	
+	channel(integer) : "HUD Channel" : 15
+	offsetx(integer) : "Offset X" : 0
+	offsety(integer) : "Offset Y" : 0
+	countnum(integer) : "Countdown Number" : 0
+	holdtime(integer) : "Holdtime" : 0
+]
+
+@PointClass base(Targetname) color(255 255 255) = trigger_hudsprite : "HUD Sprite"
+[
+	spawnflags(flags) =
+	[
+		1 : "Center X" : 0
+		2 : "Center Y" : 0
+	]
+	
+	channel(integer) : "HUD Channel" : 14
+	offsetx(integer) : "Offset X" : 0
+	offsety(integer) : "Offset Y" : 0
+	sprwidth(integer) : "Sprite Width" : 0
+	sprheight(integer) : "Sprite Height" : 0
+	framenum(integer) : "Framenum" : 0
+	holdtime(integer) : "Holdtime" : 0
+	sprite(sprite) : "Sprite"
+	sound(sound) : "Sound"
+]
+
+@PointClass base(Targetname) color(255 255 255) = trigger_random_counter : "Generate random numbers"
+[
+	minvalue(integer) : "Minimum number to generate"
+	maxvalue(integer) : "Maximum number to generate"
+	spawnflags(Flags) =
+	[
+		1 : "Average Random" 	: 0
+	]
+]
+
+@PointClass base(Targetname) color(255 255 255) = trigger_random_multiple : "Trigger multiple randoms"
+[
+	mincount(integer) : "Minimum count to trigger"
+	maxcount(integer) : "Maximum count to trigger"
+]
+
+@PointClass base(Targetname) color(255 255 255) = trigger_respawn_unstuck : "Teleport player to unstucked spawnpoint"
+[
+]
+
+@PointClass base(Targetname, Target) color(255 255 255) = trigger_rot_control : "Control func_rotating"
+[
+	newspeed(integer) : "New speed to rotate"
+]
+
+@PointClass base(Targetname, Angles) color(255 255 255) = env_shadow_control : "Shadow Control"
+[
+	distfade(string) : "Distance Fade" : "64 128"
+	lumfade(string) : "Lum Fade" : "64 32"
+	intensity(string) : "Intensity" : "0.75"
+]
+
+@SolidClass base(Targetname, ZHLTbmodel) = trigger_freeze : "Freeze Players Zone"
+[
+	spawnflags(Flags) =
+	[
+		1 : "Start On" 	: 0
+	]
+]
+
+@SolidClass base(Targetname, ZHLTbmodel, Target) color(255 255 255) = trigger_findbrush : "Find first brush in box and trigger it"
+[
+	spawnflags(flags) =
+	[
+		1 : "Use Activator Origin" : 0
+	]
+	filter_classname(string) : "Filter Classname"
+	filter_targetname(string) : "Filter Targetname"
+]
+
+@SolidClass base(Targetname, ZHLTbmodel) color(255 255 255) = func_lever : "Lever"
+[
+	spawnflags(flags) =
+	[
+		1 : "X Axis" : 0
+		2 : "Y Axis" : 0
+	]
+
+	inertia(integer) : "Moment of inertia"
+	limitangle(integer) : "Limit of rotate angle"
+	limitbouncevelocity(integer) : "Bounce velocity when hit limit"
+	limitbouncefriction(integer) : "Bounce friction when hit limit"
+	returnangle(integer) : "Return back when hit limit"
+	returnforce(integer) : "Moment of force to return back"
+]
+
+@SolidClass base(Targetname, ZHLTbmodel) color(255 255 255) = func_bouncer : "Bouncer"
+[
+	spawnflags(flags) =
+	[
+		1 : "X Axis" : 0
+		2 : "Y Axis" : 0
+		4 : "No Clients" : 0
+		8 : "No Monsters" : 0
+	]
+
+	frags(integer) : "Force of Bounce"
+	armorvalue(integer) : "Force of Bounce Upward"
+	bouncesound(sound) : "Bounce Sound"
+]
