@@ -34,6 +34,14 @@ This map is currently under construction.
 
 ![](/img/rollout.png)
 
+## Whirligig
+
+![](/img/whirligig.png)
+
+## Stompin' Ground
+
+![](/img/stompinground.png)
+
 ## Eliminated and Victory Board
 
 ![](/img/end.png)
