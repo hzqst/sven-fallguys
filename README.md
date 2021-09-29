@@ -86,7 +86,7 @@ Fall Guys in Sven Co-op
 
 * Source code is available [here](https://github.com/hzqst/metamod-fallguys)
 
-* `addons` (metamod) an `liblist.gam` must be installed into `Sven Co-op/svencoop` rather than `Sven Co-op/svencoop_addons` or `Sven Co-op/svencoop_download`.
+* `addons` (metamod) and `liblist.gam` must be installed into `Sven Co-op/svencoop` rather than `Sven Co-op/svencoop_addons` or `Sven Co-op/svencoop_download`.
 
 * Linux is currently not supported yet, since Microsoft's Detours library is used in metamod to hook engine physics shit.
 
