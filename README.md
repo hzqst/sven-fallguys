@@ -2,8 +2,6 @@
 
 Fall Guys in Sven Co-op 
 
-This map is currently under construction.
-
 # Available Content
 
 ## Stage Select
@@ -86,7 +84,9 @@ This map is currently under construction.
 
 1. metamod plugin (Already included in this repository) for physic-engine enhancement
 
-Source code is available [here](https://github.com/hzqst/metamod-fallguys)
+* Source code is available [here](https://github.com/hzqst/metamod-fallguys)
+
+* `addons` (metamod) an `liblist.gam` must be installed into `Sven Co-op/svencoop` rather than `Sven Co-op/svencoop_addons` or `Sven Co-op/svencoop_download`.
 
 * Linux is currently not supported yet, since Microsoft's Detours library is used in metamod to hook engine physics shit.
 
