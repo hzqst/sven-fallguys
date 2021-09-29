@@ -12,33 +12,65 @@ This map is currently under construction.
 
 ## Block Party
 
+* Survival
+
+* Don't fall off!
+
 ![](/img/blockparty.png)
 
 ## Slime Climb
+
+* Race
+
+* Race to the finish!
 
 ![](/img/slimeclimb.png)
 
 ## Seesaw
 
+* Race
+
+* Race to the finish!
+
 ![](/img/seesaw.png)
 
-## Match Fall
+## Perfect Match
+
+* Logic
+
+* Match the icons!
 
 ![](/img/matchfall.png)
 
 ## Jump Club
 
+* Survival
+
+* Don't fall off!
+
 ![](/img/jumpclub.png)
 
 ## Roll Out
+
+* Survival
+
+* Don't fall off!
 
 ![](/img/rollout.png)
 
 ## Whirligig
 
+* Race
+
+* Race to the finish!
+
 ![](/img/whirligig.png)
 
 ## Stompin' Ground
+
+* Survival
+
+* Don't fall off!
 
 ![](/img/stompinground.png)
 
