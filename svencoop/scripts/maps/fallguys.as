@@ -764,46 +764,51 @@ class CTriggerRespawnUnstuck : ScriptBaseEntity
 		return BaseClass.KeyValue( szKey, szValue );
 	}
 
-	int GetPlayerCountInBox(Vector origin)
-	{
-		Vector vecAbsMin = origin;
-		Vector vecAbsMax = origin;
-
-		vecAbsMin.x -= 16;
-		vecAbsMin.y -= 16;
-		vecAbsMin.z -= 32;
-		vecAbsMax.x += 16;
-		vecAbsMax.y += 16;
-		vecAbsMax.z += 32;
-
-		array<CBaseEntity@> players( 33 );
-		return g_EntityFuncs.EntitiesInBox( @players, vecAbsMin, vecAbsMax, FL_CLIENT );
-	}
-
 	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
 	{
+		g_PlayerFuncs.RespawnAllPlayers(true, true);
+
+		array<CBaseEntity@> spawnpoints = {};
+		array<CBasePlayer@> players = {};
+
 		for (int i = 0; i <= g_Engine.maxClients; i++)
 		{
 			CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
 			if(pPlayer !is null && pPlayer.IsAlive())
 			{
-				if(GetPlayerCountInBox(pPlayer.pev.origin) > 1)
-				{
-					g_Game.AlertMessage( at_console, "%1 is stucked with others\n", pPlayer.pev.netname );
+				players.insertLast(pPlayer);
+			}
+		}
 
-					CBaseEntity@ pEntity = null;
-					while((@pEntity = g_EntityFuncs.FindEntityByClassname(pEntity, "info_player_deathmatch")) !is null)
-					{
-						if(g_PlayerFuncs.IsSpawnPointValid(pEntity, pPlayer) &&
-							GetPlayerCountInBox(pEntity.pev.origin) == 0)
-						{
-							g_Game.AlertMessage( at_console, "Teleport %1 to unoccupied spawnpoint\n", pPlayer.pev.netname );
-							g_EntityFuncs.SetOrigin(pPlayer, pEntity.pev.origin);
-							pPlayer.pev.velocity = Vector(0, 0, 0);
-							break;
-						}
-					}
+		if(players.length() > 0)
+		{
+			CBaseEntity@ pEntity = null;
+			while((@pEntity = g_EntityFuncs.FindEntityByClassname(pEntity, "info_player_deathmatch")) !is null)
+			{
+				if(g_PlayerFuncs.IsSpawnPointValid(pEntity, players[0]))
+				{
+					spawnpoints.insertLast(pEntity);
 				}
+			}
+		}
+
+		for (int i = 0; i < int(players.length()); i++)
+		{
+			CBasePlayer@ pPlayer = players[i];
+			if(spawnpoints.length() > 0)
+			{
+				int randomIndex = Math.RandomLong(0, spawnpoints.length() - 1);
+				CBaseEntity@ pEntity = spawnpoints[randomIndex];
+
+				g_EntityFuncs.SetOrigin(pPlayer, pEntity.pev.origin);
+				pPlayer.pev.velocity = Vector(0, 0, 0);
+				pPlayer.pev.angles = pEntity.pev.angles;
+
+				spawnpoints.removeAt(randomIndex);
+			}
+			else
+			{
+				break;
 			}
 		}
 	}
@@ -839,7 +844,7 @@ class CTriggerRotControl : ScriptBaseEntity
 
 	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
 	{
-		//g_Game.AlertMessage( at_console, "Accelerating by %1, target %2\n", self.pev.targetname, self.pev.target);
+		g_Game.AlertMessage( at_console, "Accelerating by %1, target %2\n", self.pev.targetname, self.pev.target);
 
 		if(useType == USE_TOGGLE || useType == USE_ON)
 		{
@@ -854,7 +859,7 @@ class CTriggerRotControl : ScriptBaseEntity
 					Vector saved_avelocity = pTarget.pev.avelocity;
 					pTarget.pev.avelocity = Vector(0, 0, 0);
 					
-					//g_Game.AlertMessage( at_console, "Accelerating for %1!\n", pTarget.pev.targetname);
+					g_Game.AlertMessage( at_console, "Accelerating for %1!\n", pTarget.pev.targetname);
 
 					g_EntityFuncs.FireTargets( self.pev.target, self, self, USE_ON, flValue );
 
