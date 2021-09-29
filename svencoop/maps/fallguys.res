@@ -1,8 +1,6 @@
 // Created with resguy v9 (September 2018)
 // https://github.com/wootguy/resguy
 
-maps/fallguys.cfg
-maps/fallguys.res
 gfx/env/fallguysskyboxbk.tga
 gfx/env/fallguysskyboxdn.tga
 gfx/env/fallguysskyboxft.tga
@@ -32,7 +30,9 @@ sound/fallguys/reveal.ogg
 sound/fallguys/roundend.ogg
 sound/fallguys/survival.ogg
 sound/fallguys/win.ogg
+sound/fallguys/bounce.ogg
 sprites/fallguys/countdown.spr
 sprites/fallguys/qualified.spr
 sprites/fallguys/roundend.spr
 sprites/fallguys/timer.spr
+sprites/laserbeam.spr

@@ -799,6 +799,7 @@ class CTriggerRespawnUnstuck : ScriptBaseEntity
 						{
 							g_Game.AlertMessage( at_console, "Teleport %1 to unoccupied spawnpoint\n", pPlayer.pev.netname );
 							g_EntityFuncs.SetOrigin(pPlayer, pEntity.pev.origin);
+							pPlayer.pev.velocity = Vector(0, 0, 0);
 							break;
 						}
 					}
@@ -1245,6 +1246,42 @@ HookReturnCode PlayerSpawn(CBasePlayer@ pPlayer)
     return HOOK_CONTINUE;
 }
 
+HookReturnCode PlayerTakeDamage(DamageInfo@ info)
+{
+	if(info.pAttacker !is null && info.pAttacker.IsMonster())
+	{
+		CBaseMonster@ pMonster = cast<CBaseMonster@>(info.pAttacker);
+		CBasePlayer@ pPlayer = cast<CBasePlayer@>(info.pVictim);
+
+		if(pPlayer !is null && pPlayer.IsNetClient())
+		{
+			//g_Game.AlertMessage( at_console, "PlayerTakeDamage %1\n", pMonster.pev.classname);
+			if(pMonster.pev.classname == "monster_bullchicken")
+			{
+				info.flDamage = 0;
+				pPlayer.pev.punchangle.z = -20;
+				pPlayer.pev.punchangle.x = 20;
+
+				pPlayer.pev.velocity = pPlayer.pev.velocity + g_Engine.v_forward * (pMonster.pev.frags - 300);
+				pPlayer.pev.velocity = pPlayer.pev.velocity + g_Engine.v_up * (pMonster.pev.armorvalue - 300);
+
+				return HOOK_HANDLED;
+			}
+		}
+	}
+    return HOOK_CONTINUE;
+}
+
+HookReturnCode PlayerPostThink(CBasePlayer@ pPlayer)
+{
+    if(pPlayer is null || !pPlayer.IsConnected() || !pPlayer.IsAlive())
+        return HOOK_CONTINUE;
+
+	pPlayer.m_iWeaponVolume = LOUD_GUN_VOLUME;
+
+    return HOOK_CONTINUE;
+}
+
 void MapInit()
 {
 	//Point entity
@@ -1265,6 +1302,8 @@ void MapInit()
 	
 	g_Hooks.RegisterHook(Hooks::Player::PlayerKilled, @Killed);
 	g_Hooks.RegisterHook(Hooks::Player::PlayerSpawn, @PlayerSpawn);
+    g_Hooks.RegisterHook(Hooks::Player::PlayerTakeDamage, @PlayerTakeDamage);
+    g_Hooks.RegisterHook(Hooks::Player::PlayerPostThink, @PlayerPostThink);
 }
 
 void PluginInit()
