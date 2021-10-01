@@ -88,7 +88,7 @@ Fall Guys in Sven Co-op
 
 * Source code is available [here](https://github.com/hzqst/metamod-fallguys)
 
-* `addons` (metamod) and `liblist.gam` must be installed into `Sven Co-op/svencoop` , Installation at `Sven Co-op/svencoop_addons` or `Sven Co-op/svencoop_download` will not work.
+* `addons` (metamod) and `liblist.gam` must be installed into `Sven Co-op/svencoop` rather than `Sven Co-op/svencoop_addons` or `Sven Co-op/svencoop_download`.
 
 # Credits
 
