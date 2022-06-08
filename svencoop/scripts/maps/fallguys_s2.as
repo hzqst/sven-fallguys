@@ -3082,6 +3082,23 @@ HookReturnCode PlayerAddToFullPack( entity_state_t@ state, int e, edict_t @ent, 
 		{
 			uiFlags |= 1;
 		}
+		else
+		{
+			float distance = (ent.vars.origin - g_EngineFuncs.GetViewEntity(host).vars.origin).Length();
+
+			if(distance > 1000.0)
+			{
+				state.scale = 1.0;
+			}
+			else if(distance > 300.0)
+			{
+				state.scale = 0.15 + 0.85 * (distance - 300.0) / 700.0;
+			}
+			 else
+			{
+				state.scale = 0.15;
+			}
+		}
 	}
 
     return HOOK_HANDLED;
