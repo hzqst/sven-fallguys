@@ -79,7 +79,8 @@ class CEnvStudioModel : ScriptBaseEntity
 		Precache();
 
 		self.pev.solid = SOLID_NOT;
-		self.pev.movetype = MOVETYPE_NONE;
+		self.pev.movetype = MOVETYPE_NOCLIP;
+
 		self.pev.iuser4 = g_iLodStudioModelMagicNumber;
 
 		g_EntityFuncs.SetModel( self, self.pev.model );
@@ -123,6 +124,8 @@ class CFuncRotatingFg : ScriptBaseEntity
 	float m_flFanFriction = 1.0;
 	float m_flPushForce = 0.0;
 	float m_flUpForce = 0.0;
+	float m_flBlockPushForce = 0.0;
+	float m_flBlockUpForce = 0.0;
 	float m_flBlockCrushTime = 4.0;
 
 	array<string> m_szHitSoundName = {
@@ -194,6 +197,16 @@ class CFuncRotatingFg : ScriptBaseEntity
 
 		if(szKey == "upforce"){
 			m_flUpForce = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "blockpushforce"){
+			m_flBlockPushForce = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "blockupforce"){
+			m_flBlockUpForce = atof(szValue);
 			return true;
 		}
 
@@ -333,11 +346,11 @@ class CFuncRotatingFg : ScriptBaseEntity
 
 	void Blocked( CBaseEntity@ pOther )
 	{
-		if(m_flPushForce > 0.0)
+		if(m_flBlockPushForce > 0.0)
 		{
 			Vector vDir = pOther.pev.origin - self.pev.origin;
 			vDir = vDir.Normalize();
-			pOther.pev.velocity = vDir * m_flPushForce;
+			pOther.pev.velocity = vDir * m_flBlockPushForce;
 
 			if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
 
@@ -347,12 +360,12 @@ class CFuncRotatingFg : ScriptBaseEntity
 			}
 		}
 
-		if(m_flUpForce > 0)
+		if(m_flBlockUpForce > 0)
 		{
-			if(pOther.pev.velocity.z < m_flUpForce)
-				pOther.pev.velocity.z = m_flUpForce;
+			if(pOther.pev.velocity.z < m_flBlockUpForce)
+				pOther.pev.velocity.z = m_flBlockUpForce;
 		}
-
+		
 		if(g_ArrayBlockPlayer[pOther.entindex()].IsBlocking)
 		{
 			if(g_Engine.time > g_ArrayBlockPlayer[pOther.entindex()].flStartBlockTime + m_flBlockCrushTime)
@@ -418,7 +431,7 @@ class CFuncRotatingFg : ScriptBaseEntity
 	void SpinDown()
 	{
 		NextThink(self.pev.ltime + 0.1, false);
-		SetThink(ThinkFunction(this.SpinUp));
+		SetThink(ThinkFunction(this.SpinDown));
 
 		self.pev.avelocity = self.pev.avelocity - (self.pev.movedir * (self.pev.speed * m_flFanFriction));
 
