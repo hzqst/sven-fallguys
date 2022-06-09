@@ -57,10 +57,14 @@ const string g_szPlayerGrabSound = "fallguys/grab.ogg";
 const string g_szPlayerGrabReleaseSound = "fallguys/grabrelease.ogg";
 
 const string g_szPlayerArrowSprite = "sprites/fallguys/playerarrow.spr";
+const string g_szPlayerArrowSprite2 = "sprites/fallguys/playerarrow2.spr";
 
 const int g_iPlayerArrowSpriteMagicNumber = 1919810;
 
 const int g_iLodStudioModelMagicNumber = 1919811;
+
+int g_iPlayerArrowSpriteModelIndex = 0;
+int g_iPlayerArrowSprite2ModelIndex = 0;
 
 class CEnvStudioModel : ScriptBaseEntity
 {
@@ -3272,23 +3276,55 @@ HookReturnCode PlayerAddToFullPack( entity_state_t@ state, int e, edict_t @ent, 
 	{
 		if(ent.vars.iuser1 != g_EngineFuncs.IndexOfEdict(host))
 		{
+			//Hide other player's arrows
 			uiFlags |= 1;
 		}
 		else
 		{
-			float distance = (ent.vars.origin - g_EngineFuncs.GetViewEntity(host).vars.origin).Length();
+			edict_t @viewEnt = g_EngineFuncs.GetViewEntity(host);
+			if(@viewEnt == @host)
+			{
+				float distance = (ent.vars.origin - viewEnt.vars.origin).Length();
 
-			if(distance > 1000.0)
-			{
-				state.scale = 1.0;
+				if(distance > 1000.0)
+				{
+					state.modelindex = g_iPlayerArrowSprite2ModelIndex;
+					state.scale = 0.75;
+				}
+				else if(distance > 300.0)
+				{
+					state.modelindex = g_iPlayerArrowSprite2ModelIndex;
+					state.scale = 0.15 + 0.65 * (distance - 300.0) / 700.0;
+				}
+				else
+				{
+					state.scale = 0.15;
+				}
 			}
-			else if(distance > 300.0)
+			else
 			{
-				state.scale = 0.15 + 0.85 * (distance - 300.0) / 700.0;
-			}
-			 else
-			{
-				state.scale = 0.15;
+				float distance = (ent.vars.origin - viewEnt.vars.origin).Length();
+
+				//trigger_camera or something
+				if(distance > 1000.0)
+				{
+					state.modelindex = g_iPlayerArrowSprite2ModelIndex;
+					state.scale = 0.75;
+				}
+				else if(distance > 600.0)
+				{
+					state.modelindex = g_iPlayerArrowSprite2ModelIndex;
+					state.scale = 0.15 + 0.6 * (distance - 300.0) / 700.0;
+				}
+				else if(distance > 300.0)
+				{
+					state.modelindex = g_iPlayerArrowSprite2ModelIndex;
+					state.scale = 0.15 + 0.6 * (distance - 300.0) / 700.0;
+				}
+				else
+				{
+					state.scale = 0.15;
+				}
 			}
 		}
 	}
@@ -3668,7 +3704,8 @@ void MapInit()
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerFreeze", "trigger_freeze" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerFindBrush", "trigger_findbrush" );
 
-	g_Game.PrecacheModel( g_szPlayerArrowSprite );
+	g_iPlayerArrowSpriteModelIndex = g_Game.PrecacheModel( g_szPlayerArrowSprite );
+	g_iPlayerArrowSprite2ModelIndex = g_Game.PrecacheModel( g_szPlayerArrowSprite2 );
 
 	g_Game.PrecacheGeneric( "sound/" + m_szEliminatedSndName );
 

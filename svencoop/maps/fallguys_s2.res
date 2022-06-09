@@ -59,6 +59,7 @@ sound/fallguys/slide.ogg
 sound/fallguys/win.ogg
 sound/fallguys/bounce.ogg
 sprites/fallguys/playerarrow.spr
+sprites/fallguys/playerarrow2.spr
 sprites/fallguys/countdown.spr
 sprites/fallguys/qualified.spr
 sprites/fallguys/roundend.spr
@@ -71,6 +72,7 @@ models/fallguys/barrier2.mdl
 models/fallguys/barrier3.mdl
 models/fallguys/blade.mdl
 models/fallguys/btri.mdl
+models/fallguys/bplat.mdl
 models/fallguys/bumper.mdl
 models/fallguys/flag.mdl
 models/fallguys/flagbase.mdl
