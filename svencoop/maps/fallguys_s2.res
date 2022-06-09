@@ -55,6 +55,7 @@ sound/fallguys/race.ogg
 sound/fallguys/reveal.ogg
 sound/fallguys/roundend.ogg
 sound/fallguys/survival.ogg
+sound/fallguys/slide.ogg
 sound/fallguys/win.ogg
 sound/fallguys/bounce.ogg
 sprites/fallguys/playerarrow.spr

@@ -47,7 +47,6 @@ array<CPlayerBlockStateItem> g_ArrayBlockPlayer(33);
 array<int> g_ArrayGrabPlayer(33);
 array<float> g_ArrayBouncePlayer(33);
 array<bool> g_ArrayFallingPlayer(33);
-//array<float> g_ArrayArrowPlayer(33);
 array<EHandle> g_ArrayArrowEntityPlayer(33);
 array<string> g_ArrayFallingPlayerPlayingSound(33);
 
@@ -63,10 +62,10 @@ const int g_iPlayerArrowSpriteMagicNumber = 1919810;
 
 const int g_iLodStudioModelMagicNumber = 1919811;
 
-int g_iPlayerArrowSprite = 0;
-
 class CEnvStudioModel : ScriptBaseEntity
 {
+	CBaseEntity @m_CopyFromEntity = null;
+
 	void Precache()
 	{
 		BaseClass.Precache();
@@ -79,13 +78,19 @@ class CEnvStudioModel : ScriptBaseEntity
 		Precache();
 
 		self.pev.solid = SOLID_NOT;
-		self.pev.movetype = MOVETYPE_NOCLIP;
+		self.pev.movetype = MOVETYPE_NONE;
 
 		self.pev.iuser4 = g_iLodStudioModelMagicNumber;
 
 		g_EntityFuncs.SetModel( self, self.pev.model );
 		g_EntityFuncs.SetSize( self.pev, self.pev.mins, self.pev.maxs );
 		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+
+		if(!string(self.pev.target).IsEmpty())
+		{
+			self.pev.nextthink = g_Engine.time + 1.5;
+			SetThink(ThinkFunction(this.Animate));
+		}
 	}
 
 	bool KeyValue( const string & in szKey, const string & in szValue )
@@ -117,15 +122,47 @@ class CEnvStudioModel : ScriptBaseEntity
 
 		return BaseClass.KeyValue( szKey, szValue );
 	}
+
+	void Animate()
+	{
+		//g_Game.AlertMessage( at_console, "Animate %1", string(self.pev.target));
+
+		if(m_CopyFromEntity is null)
+		{
+			if(string(self.pev.target).IsEmpty())
+				return;
+
+			CBaseEntity @pTarget = g_EntityFuncs.FindEntityByTargetname( null, self.pev.target );
+
+			if(pTarget is null)
+				return;
+
+			@m_CopyFromEntity = @pTarget;
+			self.pev.movetype = MOVETYPE_NOCLIP;
+		}
+
+		if((self.pev.spawnflags & 1) == 1)
+			self.pev.origin = m_CopyFromEntity.pev.origin;
+	
+		if((self.pev.spawnflags & 2) == 2)		
+			self.pev.angles = m_CopyFromEntity.pev.angles;
+
+		self.pev.nextthink = g_Engine.time;
+	}
 }
 
 class CFuncRotatingFg : ScriptBaseEntity
 {
 	float m_flFanFriction = 1.0;
+	float m_flInitialSpeed = 1.0;
 	float m_flPushForce = 0.0;
 	float m_flUpForce = 0.0;
-	float m_flBlockPushForce = 0.0;
+	float m_flOutForce = 0.0;
 	float m_flBlockUpForce = 0.0;
+	float m_flBlockOutForce = 0.0;
+	float m_flSlideForce = 0.0;
+	float m_flMaxVelocity = 0.0;
+	float m_flDynamicForce = 0.0;
 	float m_flBlockCrushTime = 4.0;
 
 	array<string> m_szHitSoundName = {
@@ -135,6 +172,7 @@ class CFuncRotatingFg : ScriptBaseEntity
 	};
 
 	string m_szBlockSoundName = "fallguys/mecha.ogg";
+	string m_szSlideSoundName = "fallguys/slide.ogg";
 
 	void Precache()
 	{
@@ -145,11 +183,15 @@ class CFuncRotatingFg : ScriptBaseEntity
 		g_SoundSystem.PrecacheSound( m_szHitSoundName[2] );
 
 		g_SoundSystem.PrecacheSound( m_szBlockSoundName );
+		g_SoundSystem.PrecacheSound( m_szSlideSoundName );
 	}
 
 	void Spawn()
 	{
 		Precache();
+
+		if(self.pev.speed > 0)
+			m_flInitialSpeed = self.pev.speed;
 
 		if (m_flFanFriction == 0.0)
 			m_flFanFriction = 1.0;
@@ -200,13 +242,33 @@ class CFuncRotatingFg : ScriptBaseEntity
 			return true;
 		}
 
-		if(szKey == "blockpushforce"){
-			m_flBlockPushForce = atof(szValue);
+		if(szKey == "outforce"){
+			m_flOutForce = atof(szValue);
 			return true;
 		}
 
 		if(szKey == "blockupforce"){
 			m_flBlockUpForce = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "blockoutforce"){
+			m_flBlockOutForce = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "slideforce"){
+			m_flSlideForce = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "maxvelocity"){
+			m_flMaxVelocity = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "dynamicforce"){
+			m_flDynamicForce = atof(szValue);
 			return true;
 		}
 
@@ -235,7 +297,54 @@ class CFuncRotatingFg : ScriptBaseEntity
 			return true;
 		}
 
+		if(szKey == "slidesound"){
+			m_szSlideSoundName = szValue;
+			return true;
+		}
+
+
 		return BaseClass.KeyValue( szKey, szValue );
+	}
+
+	bool IsRotating()
+	{
+		return (self.pev.avelocity.x == 0.0 && self.pev.avelocity.y == 0.0 && self.pev.avelocity.z == 0.0) ? false : true;
+	}
+
+	float GetCurrentRotateSpeed()
+	{
+		float speed = 0.0;
+		if(self.pev.movedir.x != 0.0) 
+		{
+			speed = self.pev.avelocity.x;
+		}
+		else if(self.pev.movedir.y != 0.0)
+		{
+			speed = self.pev.avelocity.y;
+		}
+		else
+		{
+			speed = self.pev.avelocity.z;
+		}
+		return abs(speed);
+	}
+
+	float GetCurrentRotateDirection()
+	{
+		float vecdir = 0.0;
+		if(self.pev.movedir.x != 0.0) 
+		{
+			vecdir = self.pev.movedir.x;
+		}
+		else if(self.pev.movedir.y != 0.0)
+		{
+			vecdir = self.pev.movedir.y;
+		}
+		else
+		{
+			vecdir = self.pev.movedir.z;
+		}
+		return vecdir;
 	}
 
 	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
@@ -244,7 +353,7 @@ class CFuncRotatingFg : ScriptBaseEntity
 		{
 			if(useType == USE_TOGGLE)
 			{
-				if (self.pev.avelocity.x == 0.0 && self.pev.avelocity.y == 0.0 && self.pev.avelocity.z == 0.0)
+				if (!IsRotating())
 				{
 					NextThink(self.pev.ltime + 0.1, false);
 					SetThink(ThinkFunction(this.SpinUp));
@@ -257,7 +366,7 @@ class CFuncRotatingFg : ScriptBaseEntity
 			}
 			else if(useType == USE_ON)
 			{
-				if (self.pev.avelocity.x == 0.0 && self.pev.avelocity.y == 0.0 && self.pev.avelocity.z == 0.0)
+				if (!IsRotating())
 				{
 					NextThink(self.pev.ltime + 0.1, false);
 					SetThink(ThinkFunction(this.SpinUp));
@@ -265,14 +374,36 @@ class CFuncRotatingFg : ScriptBaseEntity
 			}
 			else if(useType == USE_OFF)
 			{
-				if (self.pev.avelocity.x == 0.0 && self.pev.avelocity.y == 0.0 && self.pev.avelocity.z == 0.0)
-				{
-					
-				}
-				else
+				//g_Game.AlertMessage( at_console, "Turning Off %1\n", string(self.pev.targetname));
+
+				if (IsRotating())
 				{
 					NextThink(self.pev.ltime + 0.1, false);
 					SetThink(ThinkFunction(this.SpinDown));
+				}
+			}
+			else if(useType == USE_SET && flValue > 0.0)
+			{
+				//g_Game.AlertMessage( at_console, "Change Speed of %1 to %2\n", string(self.pev.targetname), flValue);
+
+				if (!IsRotating())
+				{
+					self.pev.speed = flValue;
+				}
+				else
+				{
+					if(self.pev.speed < flValue)
+					{
+						self.pev.speed = flValue;
+						NextThink(self.pev.ltime + 0.1, false);
+						SetThink(ThinkFunction(this.SpinUp));
+					}
+					else if(self.pev.speed > flValue)
+					{
+						self.pev.speed = flValue;
+						NextThink(self.pev.ltime + 0.1, false);
+						SetThink(ThinkFunction(this.SpinDown));
+					}
 				}
 			}
 		}
@@ -280,7 +411,7 @@ class CFuncRotatingFg : ScriptBaseEntity
 		{
 			if(useType == USE_TOGGLE)
 			{
-				if (self.pev.avelocity.x == 0.0 && self.pev.avelocity.y == 0.0 && self.pev.avelocity.z == 0.0)
+				if (!IsRotating())
 				{
 					self.pev.avelocity = self.pev.movedir * self.pev.speed;
 					NextThink(self.pev.ltime + 0.1, false);
@@ -295,7 +426,7 @@ class CFuncRotatingFg : ScriptBaseEntity
 			}
 			else if(useType == USE_ON)
 			{
-				if (self.pev.avelocity.x == 0.0 && self.pev.avelocity.y == 0.0 && self.pev.avelocity.z == 0.0)
+				if (!IsRotating())
 				{
 					self.pev.avelocity = self.pev.movedir * self.pev.speed;
 					NextThink(self.pev.ltime + 0.1, false);
@@ -304,29 +435,62 @@ class CFuncRotatingFg : ScriptBaseEntity
 			}
 			else if(useType == USE_OFF)
 			{
-				if (self.pev.avelocity.x == 0.0 && self.pev.avelocity.y == 0.0 && self.pev.avelocity.z == 0.0)
+				//g_Game.AlertMessage( at_console, "Turning Off %1\n", string(self.pev.targetname));
+
+				if (IsRotating())
 				{
-					
-				}
-				else
-				{
-					self.pev.avelocity = Vector(0.0, 0.0, 0.0);
+					self.pev.avelocity = g_vecZero;
 					NextThink(self.pev.ltime + 0.1, false);
 					SetThink(ThinkFunction(this.Rotate));
 				}
 			}
+			else if(useType == USE_SET && flValue > 0.0)
+			{
+				//g_Game.AlertMessage( at_console, "Change speed of %1 to %2\n", string(self.pev.targetname), flValue);
+
+				if (!IsRotating())
+				{
+					self.pev.speed = flValue;
+				}
+				else
+				{
+					if(self.pev.speed != flValue)
+					{
+						self.pev.speed = flValue;
+						self.pev.avelocity = self.pev.movedir * self.pev.speed;
+						NextThink(self.pev.ltime + 0.1, false);
+						SetThink(ThinkFunction(this.Rotate));
+					}
+				}
+			}
 		}
+	}
+
+	float CalcDynamicForce(float flValue)
+	{
+		if(m_flDynamicForce > 0)
+		{
+			float flCurrentSpeed = GetCurrentRotateSpeed();
+			if(flCurrentSpeed > 0)
+				return flValue * pow(flCurrentSpeed / m_flInitialSpeed, m_flDynamicForce);
+			else
+				return flValue;
+		}
+		return flValue;
 	}
 
 	void Touch( CBaseEntity@ pOther )
 	{
 		if(self.pev.sequence == 1919810)
 		{
-			if(m_flPushForce > 0.0)
+			if(m_flPushForce > 0)
 			{
+				float flForce = CalcDynamicForce(m_flPushForce);
+
 				Vector vDir = self.pev.vuser1;
 				vDir = vDir.Normalize();
-				pOther.pev.velocity = vDir * m_flPushForce;		
+
+				pOther.pev.velocity = vDir * flForce;
 
 				if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
 
@@ -338,34 +502,98 @@ class CFuncRotatingFg : ScriptBaseEntity
 
 			if(m_flUpForce > 0)
 			{
-				if(pOther.pev.velocity.z < m_flUpForce)
-					pOther.pev.velocity.z = m_flUpForce;
+				float flForce = CalcDynamicForce(m_flUpForce);
+
+				if(pOther.pev.velocity.z < flForce)
+					pOther.pev.velocity.z = flForce;
+			}
+
+			if(m_flOutForce > 0)
+			{
+				float flForce = CalcDynamicForce(m_flOutForce);
+
+				Math.MakeVectors( self.pev.angles );
+
+				Vector vOut = g_Engine.v_forward;
+
+				if(m_flMaxVelocity > 0)
+				{
+					float flMaxVelocity = m_flMaxVelocity;
+					if(m_flDynamicForce > 0)
+					{
+						flMaxVelocity = flMaxVelocity * (GetCurrentRotateSpeed() / m_flInitialSpeed) * m_flDynamicForce;
+					}
+
+					if(DotProduct(pOther.pev.velocity, vOut) > flMaxVelocity)
+						return;
+				}
+
+				pOther.pev.velocity = vOut * flForce;
+			}
+			return;
+		}
+
+		if((self.pev.spawnflags & (SF_BRUSH_ROTATE_Z_AXIS | SF_BRUSH_ROTATE_X_AXIS)) == 0)
+		{
+			if(m_flSlideForce > 0)
+			{
+				float flForce = CalcDynamicForce(m_flSlideForce);
+
+				if((pOther.pev.flags & FL_ONGROUND) == FL_ONGROUND && (pOther.pev.groundentity is self.edict() ))
+				{
+					Math.MakeVectors( self.pev.angles );
+
+					Vector vRight = g_Engine.v_right;
+					Vector vLeft = -g_Engine.v_right;
+					Vector vDiff = (pOther.pev.origin - self.pev.origin);
+					vDiff.z = 0;
+					vDiff = vDiff.Normalize();
+
+					if(DotProduct(vDiff, vLeft) > 0)
+					{
+						if(m_flMaxVelocity > 0)
+						{
+							float flMaxVelocity = CalcDynamicForce(m_flMaxVelocity);
+
+							if(DotProduct(pOther.pev.velocity, vLeft) > flMaxVelocity)
+								return;
+						}
+
+						pOther.pev.basevelocity = vLeft * flForce;
+
+						if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
+
+							g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szSlideSoundName, 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+
+							g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+						}
+					}
+					else if(DotProduct(vDiff, vRight) > 0)
+					{
+						if(m_flMaxVelocity > 0)
+						{
+							float flMaxVelocity = CalcDynamicForce(m_flMaxVelocity);
+
+							if(DotProduct(pOther.pev.velocity, vRight) > flMaxVelocity)
+								return;
+						}
+
+						pOther.pev.basevelocity = vRight * flForce;
+
+						if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
+							
+							g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szSlideSoundName, 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+
+							g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+						}
+					}
+				}
 			}
 		}
 	}
 
 	void Blocked( CBaseEntity@ pOther )
 	{
-		if(m_flBlockPushForce > 0.0)
-		{
-			Vector vDir = pOther.pev.origin - self.pev.origin;
-			vDir = vDir.Normalize();
-			pOther.pev.velocity = vDir * m_flBlockPushForce;
-
-			if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
-
-				g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_BODY, m_szHitSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
-
-				g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
-			}
-		}
-
-		if(m_flBlockUpForce > 0)
-		{
-			if(pOther.pev.velocity.z < m_flBlockUpForce)
-				pOther.pev.velocity.z = m_flBlockUpForce;
-		}
-		
 		if(g_ArrayBlockPlayer[pOther.entindex()].IsBlocking)
 		{
 			if(g_Engine.time > g_ArrayBlockPlayer[pOther.entindex()].flStartBlockTime + m_flBlockCrushTime)
@@ -385,6 +613,30 @@ class CFuncRotatingFg : ScriptBaseEntity
 				g_ArrayBlockPlayer[pOther.entindex()].szPlayingSound = m_szBlockSoundName;
 				g_ArrayBlockPlayer[pOther.entindex()].flLastSoundTime = g_Engine.time;
 			}
+		}
+
+		if(m_flBlockOutForce > 0)
+		{
+			float flForce = CalcDynamicForce(m_flBlockOutForce);
+
+			Vector vDir = pOther.pev.origin - self.pev.origin;
+			vDir = vDir.Normalize();
+			pOther.pev.velocity = vDir * flForce;
+
+			if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()])
+			{
+				g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_BODY, m_szHitSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+
+				g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+			}
+		}
+
+		if(m_flBlockUpForce > 0)
+		{
+			float flForce = CalcDynamicForce(m_flBlockUpForce);
+
+			if(pOther.pev.velocity.z < flForce)
+				pOther.pev.velocity.z = flForce;
 		}
 	}
 
@@ -436,23 +688,11 @@ class CFuncRotatingFg : ScriptBaseEntity
 		self.pev.avelocity = self.pev.avelocity - (self.pev.movedir * (self.pev.speed * m_flFanFriction));
 
 		Vector vecAVel = self.pev.avelocity;
-		float vecdir = 0.0;
-		if(self.pev.movedir.x != 0.0) 
-		{
-			vecdir = self.pev.movedir.x;
-		}
-		else if(self.pev.movedir.y != 0.0)
-		{
-			vecdir = self.pev.movedir.y;
-		}
-		else
-		{
-			vecdir = self.pev.movedir.z;
-		}
+		float vecdir = GetCurrentRotateDirection();
 
 		if (((vecdir > 0.0) && (vecAVel.x <= 0.0 && vecAVel.y <= 0.0 && vecAVel.z <= 0.0)) || ((vecdir < 0.0) && (vecAVel.x >= 0.0 && vecAVel.y >= 0.0 && vecAVel.z >= 0.0)))
 		{
-			self.pev.avelocity = Vector(0.0, 0.0, 0.0);
+			self.pev.avelocity = g_vecZero;
 			SetThink(ThinkFunction(this.Rotate));
 		}
 	}
@@ -2502,8 +2742,6 @@ class CTriggerRespawnUnstuck : ScriptBaseEntity
 
 class CTriggerRotControl : ScriptBaseEntity
 {
-	float m_flNewSpeed = 0;
-
 	void Precache()
 	{
 		BaseClass.Precache();
@@ -2522,11 +2760,6 @@ class CTriggerRotControl : ScriptBaseEntity
 
 	bool KeyValue( const string & in szKey, const string & in szValue )
 	{	
-		if(szKey == "newspeed"){
-			m_flNewSpeed = atof(szValue);
-			return true;
-		}
-
 		return BaseClass.KeyValue( szKey, szValue );
 	}
 
@@ -2536,61 +2769,7 @@ class CTriggerRotControl : ScriptBaseEntity
 
 		if(useType == USE_TOGGLE || useType == USE_ON)
 		{
-			CBaseEntity@ pTarget = null;
-			while((@pTarget = g_EntityFuncs.FindEntityByTargetname(pTarget, self.pev.target)) !is null)
-			{
-				if((pTarget.pev.spawnflags & SF_BRUSH_ACCDCC) == 0)
-				{
-					pTarget.pev.spawnflags |= SF_BRUSH_ACCDCC;
-					pTarget.pev.speed = m_flNewSpeed;
-
-					Vector saved_avelocity = pTarget.pev.avelocity;
-					pTarget.pev.avelocity = Vector(0, 0, 0);
-					
-					//g_Game.AlertMessage( at_console, "Accelerating for %1!\n", pTarget.pev.targetname);
-
-					g_EntityFuncs.FireTargets( self.pev.target, self, self, USE_ON, flValue );
-
-					pTarget.pev.avelocity = saved_avelocity;
-					pTarget.pev.spawnflags &= ~SF_BRUSH_ACCDCC;
-				}
-				else
-				{
-					pTarget.pev.speed = m_flNewSpeed;
-
-					Vector saved_avelocity = pTarget.pev.avelocity;
-					pTarget.pev.avelocity = Vector(0, 0, 0);
-					
-					//g_Game.AlertMessage( at_console, "Accelerating for %1!\n", pTarget.pev.targetname);
-
-					g_EntityFuncs.FireTargets( self.pev.target, self, self, USE_ON, flValue );
-
-					pTarget.pev.avelocity = saved_avelocity;
-				}
-			}
-		}
-		else if(useType == USE_OFF)
-		{
-			CBaseEntity@ pTarget = null;
-			while((@pTarget = g_EntityFuncs.FindEntityByTargetname(pTarget, self.pev.target)) !is null)
-			{
-				if((pTarget.pev.spawnflags & SF_BRUSH_ACCDCC) == 0)
-				{
-					pTarget.pev.spawnflags |= SF_BRUSH_ACCDCC;
-					pTarget.pev.speed = pTarget.pev.frags;
-					pTarget.pev.angles = Vector(0, 0, 0);
-					g_EntityFuncs.FireTargets( self.pev.target, self, self, USE_OFF, flValue );
-
-					pTarget.pev.spawnflags &= ~SF_BRUSH_ACCDCC;
-				}
-				else
-				{
-					pTarget.pev.speed = pTarget.pev.frags;
-					pTarget.pev.angles = Vector(0, 0, 0);
-
-					g_EntityFuncs.FireTargets( self.pev.target, self, self, USE_OFF, flValue );
-				}
-			}
+			g_EntityFuncs.FireTargets( self.pev.target, self, self, USE_SET, self.pev.speed );
 		}
 	}
 }
@@ -3269,16 +3448,6 @@ void PlayerShowArrow(CBasePlayer@ pPlayer)
 	//pEntity.pev.renderamt = 255;
 	
 	g_ArrayArrowEntityPlayer[pPlayer.entindex()] = EHandle(@pEntity);
-
-	/*NetworkMessage m(MSG_ONE, NetworkMessages::SVC_TEMPENTITY, pPlayer.edict() );
-		m.WriteByte(TE_PLAYERATTACHMENT);
-		m.WriteByte(pPlayer.entindex());
-		m.WriteCoord(64.0);
-		m.WriteShort(g_iPlayerArrowSprite);
-		m.WriteShort(10);
-	m.End();
-
-	g_ArrayArrowPlayer[pPlayer.entindex()] = g_Engine.time + 1.0;*/
 }
 
 void PlayerHideArrow(CBasePlayer@ pPlayer)
@@ -3289,13 +3458,6 @@ void PlayerHideArrow(CBasePlayer@ pPlayer)
 		return;
 
 	eHandle.GetEntity().SUB_Remove();
-
-	/*NetworkMessage m(MSG_ONE, NetworkMessages::SVC_TEMPENTITY, pPlayer.edict());
-	m.WriteByte(TE_KILLPLAYERATTACHMENTS);
-	m.WriteByte(pPlayer.entindex());
-	m.End();
-
-	g_ArrayArrowPlayer[pPlayer.entindex()] = 0.0;*/
 }
 
 HookReturnCode PlayerPreThink(CBasePlayer@ pPlayer, uint& out uiFlags)
@@ -3327,17 +3489,11 @@ HookReturnCode PlayerPostThink(CBasePlayer@ pPlayer)
 
 	if(pPlayer.IsAlive())
 	{
-		//if(g_Engine.time > g_ArrayArrowPlayer[pPlayer.entindex()])
-		//{
-			PlayerShowArrow(pPlayer);
-		//}
+		PlayerShowArrow(pPlayer);
 	}
 	else
 	{
-		//if(g_Engine.time < g_ArrayArrowPlayer[pPlayer.entindex()])
-		//{
-			PlayerHideArrow(pPlayer);
-		//}
+		PlayerHideArrow(pPlayer);
 	}
 
 	if(pPlayer.IsAlive())
@@ -3512,7 +3668,7 @@ void MapInit()
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerFreeze", "trigger_freeze" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerFindBrush", "trigger_findbrush" );
 
-	g_iPlayerArrowSprite = g_Game.PrecacheModel( g_szPlayerArrowSprite );
+	g_Game.PrecacheModel( g_szPlayerArrowSprite );
 
 	g_Game.PrecacheGeneric( "sound/" + m_szEliminatedSndName );
 
