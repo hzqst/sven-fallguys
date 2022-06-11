@@ -28,6 +28,17 @@ const int SF_CORNER_WAITFORTRIG  = 1;
 const int SF_CORNER_TELEPORT = 2;
 const int SF_CORNER_FIREONCE = 4;
 
+const int SF_DOOR_ROTATE_Y = 0;
+const int SF_DOOR_START_OPEN = 1;
+const int SF_DOOR_ROTATE_BACKWARDS = 2;
+const int SF_DOOR_PASSABLE = 8;
+const int SF_DOOR_ONEWAY = 16;
+const int SF_DOOR_NO_AUTO_RETURN = 32;
+const int SF_DOOR_ROTATE_Z = 64;
+const int SF_DOOR_ROTATE_X = 128;
+const int SF_DOOR_USE_ONLY = 256;
+const int SF_DOOR_NOMONSTERS = 512;
+
 class CPlayerBlockStateItem
 {
 	CPlayerBlockStateItem(){
@@ -44,11 +55,16 @@ class CPlayerBlockStateItem
 }
 
 array<CPlayerBlockStateItem> g_ArrayBlockPlayer(33);
+
 array<int> g_ArrayGrabPlayer(33);
+
+array<Vector> g_ArrayBounceVelocityPlayer(33);
 array<float> g_ArrayBouncePlayer(33);
+
 array<bool> g_ArrayFallingPlayer(33);
-array<EHandle> g_ArrayArrowEntityPlayer(33);
 array<string> g_ArrayFallingPlayerPlayingSound(33);
+
+array<EHandle> g_ArrayArrowEntityPlayer(33);
 
 array<string> g_szPlayerJumpSound(8);
 array<string> g_szPlayerFallingSound(2);
@@ -69,6 +85,8 @@ int g_iPlayerArrowSprite2ModelIndex = 0;
 class CEnvStudioModel : ScriptBaseEntity
 {
 	CBaseEntity @m_CopyFromEntity = null;
+	Vector m_OriginOffset = g_vecZero;
+	Vector m_AnglesOffset = g_vecZero;
 
 	void Precache()
 	{
@@ -124,6 +142,16 @@ class CEnvStudioModel : ScriptBaseEntity
 			return true;
 		}
 
+		if(szKey == "origin_offset"){
+			g_Utility.StringToVector( m_OriginOffset, szValue );
+			return true;
+		}
+
+		if(szKey == "angles_offset"){
+			g_Utility.StringToVector( m_AnglesOffset, szValue );
+			return true;
+		}
+
 		return BaseClass.KeyValue( szKey, szValue );
 	}
 
@@ -146,10 +174,16 @@ class CEnvStudioModel : ScriptBaseEntity
 		}
 
 		if((self.pev.spawnflags & 1) == 1)
+		{
 			self.pev.origin = m_CopyFromEntity.pev.origin;
+			self.pev.origin = self.pev.origin + m_OriginOffset;
+		}
 	
-		if((self.pev.spawnflags & 2) == 2)		
+		if((self.pev.spawnflags & 2) == 2)
+		{
 			self.pev.angles = m_CopyFromEntity.pev.angles;
+			self.pev.angles = self.pev.angles + m_AnglesOffset;
+		}
 
 		self.pev.nextthink = g_Engine.time;
 	}
@@ -306,7 +340,6 @@ class CFuncRotatingFg : ScriptBaseEntity
 			return true;
 		}
 
-
 		return BaseClass.KeyValue( szKey, szValue );
 	}
 
@@ -423,7 +456,7 @@ class CFuncRotatingFg : ScriptBaseEntity
 				}
 				else
 				{
-					self.pev.avelocity = Vector(0.0, 0.0, 0.0);
+					self.pev.avelocity = g_vecZero;
 					NextThink(self.pev.ltime + 0.1, false);
 					SetThink(ThinkFunction(this.Rotate));
 				}
@@ -485,6 +518,12 @@ class CFuncRotatingFg : ScriptBaseEntity
 
 	void Touch( CBaseEntity@ pOther )
 	{
+		if(!pOther.IsPlayer())
+			return;
+			
+		if(!pOther.IsAlive())
+			return;
+
 		if(self.pev.sequence == 1919810)
 		{
 			if(m_flPushForce > 0)
@@ -553,26 +592,7 @@ class CFuncRotatingFg : ScriptBaseEntity
 					vDiff.z = 0;
 					vDiff = vDiff.Normalize();
 
-					if(DotProduct(vDiff, vLeft) > 0)
-					{
-						if(m_flMaxVelocity > 0)
-						{
-							float flMaxVelocity = CalcDynamicForce(m_flMaxVelocity);
-
-							if(DotProduct(pOther.pev.velocity, vLeft) > flMaxVelocity)
-								return;
-						}
-
-						pOther.pev.basevelocity = vLeft * flForce;
-
-						if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
-
-							g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szSlideSoundName, 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
-
-							g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
-						}
-					}
-					else if(DotProduct(vDiff, vRight) > 0)
+					if(self.pev.movedir.y > 0)
 					{
 						if(m_flMaxVelocity > 0)
 						{
@@ -583,6 +603,25 @@ class CFuncRotatingFg : ScriptBaseEntity
 						}
 
 						pOther.pev.basevelocity = vRight * flForce;
+
+						if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
+
+							g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szSlideSoundName, 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+
+							g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+						}
+					}
+					else if(self.pev.movedir.y < 0)
+					{
+						if(m_flMaxVelocity > 0)
+						{
+							float flMaxVelocity = CalcDynamicForce(m_flMaxVelocity);
+
+							if(DotProduct(pOther.pev.velocity, vLeft) > flMaxVelocity)
+								return;
+						}
+
+						pOther.pev.basevelocity = vLeft * flForce;
 
 						if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
 							
@@ -598,6 +637,12 @@ class CFuncRotatingFg : ScriptBaseEntity
 
 	void Blocked( CBaseEntity@ pOther )
 	{
+		if(!pOther.IsPlayer())
+			return;
+			
+		if(!pOther.IsAlive())
+			return;
+
 		if(g_ArrayBlockPlayer[pOther.entindex()].IsBlocking)
 		{
 			if(g_Engine.time > g_ArrayBlockPlayer[pOther.entindex()].flStartBlockTime + m_flBlockCrushTime)
@@ -711,9 +756,18 @@ class CFuncTrainFg : ScriptBaseEntity
 	CBaseEntity @m_pCurrentTarget = null;
 	bool m_activated = false;
 	
+	float m_flBounceForce = 0.0;
 	float m_flPushForce = 0.0;
 	float m_flUpForce = 0.0;
+	float m_flBlockPushForce = 0.0;
+	float m_flBlockUpForce = 0.0;
 	float m_flBlockCrushTime = 4.0;
+
+	array<string> m_szBounceSoundName = {
+		"fallguys/bounce.ogg",
+		"fallguys/bounce2.ogg",
+		"fallguys/bounce3.ogg"
+	};
 
 	array<string> m_szHitSoundName = {
 		"fallguys/impact1.ogg",
@@ -726,6 +780,10 @@ class CFuncTrainFg : ScriptBaseEntity
 	void Precache()
 	{
 		BaseClass.Precache();
+
+		g_SoundSystem.PrecacheSound( m_szBounceSoundName[0] );
+		g_SoundSystem.PrecacheSound( m_szBounceSoundName[1] );
+		g_SoundSystem.PrecacheSound( m_szBounceSoundName[2] );
 
 		g_SoundSystem.PrecacheSound( m_szHitSoundName[0] );
 		g_SoundSystem.PrecacheSound( m_szHitSoundName[1] );
@@ -741,6 +799,11 @@ class CFuncTrainFg : ScriptBaseEntity
 			return true;
 		}
 
+		if(szKey == "bounceforce"){
+			m_flBounceForce = atof(szValue);
+			return true;
+		}
+
 		if(szKey == "pushforce"){
 			m_flPushForce = atof(szValue);
 			return true;
@@ -751,8 +814,13 @@ class CFuncTrainFg : ScriptBaseEntity
 			return true;
 		}
 
-		if(szKey == "blockcrushtime"){
-			m_flBlockCrushTime = atof(szValue);
+		if(szKey == "blockpushforce"){
+			m_flBlockPushForce = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "blockupforce"){
+			m_flBlockUpForce = atof(szValue);
 			return true;
 		}
 
@@ -771,6 +839,21 @@ class CFuncTrainFg : ScriptBaseEntity
 			return true;
 		}
 
+		if(szKey == "bouncesound0"){
+			m_szBounceSoundName[0] = szValue;
+			return true;
+		}
+
+		if(szKey == "bouncesound2"){
+			m_szBounceSoundName[1] = szValue;
+			return true;
+		}
+
+		if(szKey == "bouncesound2"){
+			m_szBounceSoundName[2] = szValue;
+			return true;
+		}
+
 		if(szKey == "blocksound"){
 			m_szBlockSoundName = szValue;
 			return true;
@@ -782,6 +865,18 @@ class CFuncTrainFg : ScriptBaseEntity
 		}
 
 		return BaseClass.KeyValue( szKey, szValue );
+	}
+
+	void Restart()
+	{
+		if (self.pev.speed == 0)
+			self.pev.speed = 100;
+
+		self.pev.movetype = MOVETYPE_PUSH;
+		@m_pCurrentTarget = @m_pSaveTarget;
+		g_EntityFuncs.SetOrigin(self, m_vecSaveOrigin);
+
+		m_activated = false;
 	}
 
 	void Spawn()
@@ -822,6 +917,12 @@ class CFuncTrainFg : ScriptBaseEntity
 
 	void Touch( CBaseEntity@ pOther )
 	{
+		if(!pOther.IsPlayer())
+			return;
+
+		if(!pOther.IsAlive())
+			return;
+
 		if(self.pev.sequence == 1919810)
 		{
 			if(m_flPushForce > 0.0)
@@ -832,8 +933,14 @@ class CFuncTrainFg : ScriptBaseEntity
 
 				if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
 
-					g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_BODY, m_szHitSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
-
+					if(m_flBounceForce > 0)
+					{
+						g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_BODY, m_szBounceSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+					}
+					else
+					{
+						g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_BODY, m_szHitSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+					}
 					g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
 				}
 			}
@@ -843,33 +950,42 @@ class CFuncTrainFg : ScriptBaseEntity
 				if(pOther.pev.velocity.z < m_flUpForce)
 					pOther.pev.velocity.z = m_flUpForce;
 			}
+
+			return;
+		}
+
+		if(m_flBounceForce > 0)
+		{
+			if((pOther.pev.flags & FL_ONGROUND) == FL_ONGROUND && (pOther.pev.groundentity is self.edict() ))
+			{
+
+			}
+			else
+			{
+				Vector vDiff = pOther.pev.origin - self.pev.origin;
+				vDiff.z = 0;
+				vDiff = vDiff.Normalize();
+
+				g_ArrayBounceVelocityPlayer[pOther.entindex()] = vDiff * m_flBounceForce;
+
+				if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
+
+					g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szBounceSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+
+					g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+				}
+			}
 		}
 	}
 
 	void Blocked( CBaseEntity@ pOther )
 	{
-		//g_Game.AlertMessage(at_aiconsole, "Train %1 Blocked by %2\n", string(self.pev.targetname), string(self.pev.netname));
+		if(!pOther.IsPlayer())
+			return;
+			
+		if(!pOther.IsAlive())
+			return;
 
-		if(m_flPushForce > 0.0)
-		{
-			Vector vDir = pOther.pev.origin - self.pev.origin;
-			vDir = vDir.Normalize();
-			pOther.pev.velocity = vDir * m_flPushForce;
-
-			if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
-
-				g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_BODY, m_szHitSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
-
-				g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
-			}
-		}
-
-		if(m_flUpForce > 0)
-		{
-			if(pOther.pev.velocity.z < m_flUpForce)
-				pOther.pev.velocity.z = m_flUpForce;
-		}
-		
 		if(g_ArrayBlockPlayer[pOther.entindex()].IsBlocking)
 		{
 			if(g_Engine.time > g_ArrayBlockPlayer[pOther.entindex()].flStartBlockTime + m_flBlockCrushTime)
@@ -889,6 +1005,26 @@ class CFuncTrainFg : ScriptBaseEntity
 				g_ArrayBlockPlayer[pOther.entindex()].szPlayingSound = m_szBlockSoundName;
 				g_ArrayBlockPlayer[pOther.entindex()].flLastSoundTime = g_Engine.time;
 			}
+		}
+
+		if(m_flBlockPushForce > 0.0)
+		{
+			Vector vDir = pOther.pev.origin - self.pev.origin;
+			vDir = vDir.Normalize();
+			pOther.pev.velocity = vDir * m_flBlockPushForce;
+
+			if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
+
+				g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_BODY, m_szHitSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+
+				g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+			}
+		}
+
+		if(m_flBlockUpForce > 0)
+		{
+			if(pOther.pev.velocity.z < m_flBlockUpForce)
+				pOther.pev.velocity.z = m_flBlockUpForce;
 		}
 	}
 
@@ -923,6 +1059,15 @@ class CFuncTrainFg : ScriptBaseEntity
 			self.pev.nextthink = 0;
 			self.pev.velocity = g_vecZero;
 		}
+		else if (useType == USE_SET)
+		{
+			if(flValue < 0)
+			{
+				Restart();
+				return;
+			}
+		}
+
 	}
 
 	void NextThink(float thinkTime, const bool alwaysThink)
@@ -960,8 +1105,13 @@ class CFuncTrainFg : ScriptBaseEntity
 
 	void Wait()
 	{
-		if (m_pCurrentTarget.pev.message != 0 && !string(m_pCurrentTarget.pev.message).IsEmpty())
+		if(m_pCurrentTarget is null)
+			return;
+
+		if (!string(m_pCurrentTarget.pev.message).IsEmpty())
 		{
+			//g_Game.AlertMessage(at_aiconsole, "Train %1 fire %2\n", string(self.pev.targetname), string(m_pCurrentTarget.pev.message));
+
 			g_EntityFuncs.FireTargets( string(m_pCurrentTarget.pev.message), self, self, USE_TOGGLE, 0 );
 
 			if ((m_pCurrentTarget.pev.spawnflags & SF_CORNER_FIREONCE) == SF_CORNER_FIREONCE)
@@ -1059,9 +1209,15 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 	float m_startSpeed = 0.0;
 	float m_flBank = 0.0;
 	float m_oldSpeed = 0.0;
+
+	//for restart
+	float m_flInitialSpeed = 0.0;
+	string m_szInitialTarget = "";
 	
 	float m_flPushForce = 0.0;
 	float m_flUpForce = 0.0;
+	float m_flBlockPushForce = 0.0;
+	float m_flBlockUpForce = 0.0;
 	float m_flBlockCrushTime = 4.0;
 
 	array<string> m_szHitSoundName = {
@@ -1083,12 +1239,9 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 		g_SoundSystem.PrecacheSound( m_szBlockSoundName );
 	}
 
-	void Spawn()
+	void Restart()
 	{
-		if (self.pev.speed == 0)
-			m_speed = 165;
-		else
-			m_speed = self.pev.speed;
+		g_Game.AlertMessage( at_console, "TRACKTRAIN (%1) restart", string(self.pev.targetname) );
 
 		self.pev.speed = 0;
 		self.pev.velocity = g_vecZero;
@@ -1096,10 +1249,35 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 		self.pev.impulse = int(m_speed);
 		m_dir = 1;
 
-		//g_Game.AlertMessage(at_console, "FuncTrain %1 Speed is %2\n", string(self.pev.targetname), m_speed);
+		self.pev.target = m_szInitialTarget;
 
 		if ( string(self.pev.target).IsEmpty() )
-			g_Game.AlertMessage( at_console, "FuncTrain %1 with no target", string(self.pev.targetname) );
+			g_Game.AlertMessage( at_console, "TRACKTRAIN (%1) has no target", string(self.pev.targetname) );
+
+		g_EntityFuncs.SetOrigin(self, self.pev.oldorigin);
+		NextThink( self.pev.ltime + 0.1, false );
+		SetThink( ThinkFunction( this.Find ) );
+	}
+
+	void Spawn()
+	{
+		if (self.pev.speed == 0)
+			m_speed = 165;
+		else
+			m_speed = self.pev.speed;
+
+		m_flInitialSpeed = m_speed;
+
+		self.pev.speed = 0;
+		self.pev.velocity = g_vecZero;
+		self.pev.avelocity = g_vecZero;
+		self.pev.impulse = int(m_speed);
+		m_dir = 1;
+
+		if ( string(self.pev.target).IsEmpty() )
+			g_Game.AlertMessage( at_console, "TRACKTRAIN (%1) has no target", string(self.pev.targetname) );
+
+		m_szInitialTarget = string(self.pev.target);
 
 		if ( ( self.pev.spawnflags & SF_TRACKTRAIN_PASSABLE ) != 0 )
 			self.pev.solid = SOLID_NOT;
@@ -1151,6 +1329,16 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 			return true;
 		}
 
+		if(szKey == "blockpushforce"){
+			m_flBlockPushForce = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "blockupforce"){
+			m_flBlockUpForce = atof(szValue);
+			return true;
+		}
+
 		if(szKey == "blockcrushtime"){
 			m_flBlockCrushTime = atof(szValue);
 			return true;
@@ -1186,7 +1374,29 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 
 	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
 	{
-		if (useType != USE_SET)
+		if (useType == USE_ON)
+		{
+			if (self.pev.speed == 0)
+			{
+				self.pev.speed = m_speed * m_dir;
+				Next();
+			}
+		}
+		else if (useType == USE_OFF)
+		{
+			if (self.pev.speed == 0)
+			{
+
+			}
+			else
+			{
+				self.pev.speed = 0;
+				self.pev.velocity = g_vecZero;
+				self.pev.avelocity = g_vecZero;
+				SetThink(null);
+			}
+		}
+		else if (useType == USE_TOGGLE)
 		{
 			if (!self.ShouldToggle(useType, (self.pev.speed != 0)))
 				return;
@@ -1204,8 +1414,14 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 				SetThink(null);
 			}
 		}
-		else
+		else if (useType == USE_SET)
 		{
+			if(flValue < 0)
+			{
+				Restart();
+				return;
+			}
+
 			float delta = flValue;
 			delta = (int(self.pev.speed * 4) / int(m_speed)) * 0.25 + 0.25 * delta;
 
@@ -1221,16 +1437,24 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 			}
 
 			self.pev.speed = m_speed * delta;
+
 			Next();
-			g_Game.AlertMessage(at_aiconsole, "TRAIN(%1), speed to %2\n", string(self.pev.targetname), self.pev.speed);
+
+			g_Game.AlertMessage(at_aiconsole, "TRACKTRAIN (%1): change speed to %2\n", string(self.pev.targetname), self.pev.speed);
 		}
 	}
 
 	void Touch( CBaseEntity@ pOther )
 	{
+		if(!pOther.IsPlayer())
+			return;
+			
+		if(!pOther.IsAlive())
+			return;
+
 		if(self.pev.sequence == 1919810)
 		{
-			if(m_flPushForce > 0.0)
+			if(m_flPushForce > 0)
 			{
 				Vector vDir = self.pev.vuser1;
 				vDir = vDir.Normalize();
@@ -1254,28 +1478,12 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 
 	void Blocked( CBaseEntity@ pOther )
 	{
-		//g_Game.AlertMessage(at_aiconsole, "FuncTrain %1 Blocked by %2\n", string(self.pev.targetname), string(self.pev.netname));
+		if(!pOther.IsPlayer())
+			return;
+			
+		if(!pOther.IsAlive())
+			return;
 
-		if(m_flPushForce > 0.0)
-		{
-			Vector vDir = pOther.pev.origin - self.pev.origin;
-			vDir = vDir.Normalize();
-			pOther.pev.velocity = vDir * m_flPushForce;
-
-			if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
-
-				g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_BODY, m_szHitSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
-
-				g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
-			}
-		}
-
-		if(m_flUpForce > 0)
-		{
-			if(pOther.pev.velocity.z < m_flUpForce)
-				pOther.pev.velocity.z = m_flUpForce;
-		}
-		
 		if(g_ArrayBlockPlayer[pOther.entindex()].IsBlocking)
 		{
 			if(g_Engine.time > g_ArrayBlockPlayer[pOther.entindex()].flStartBlockTime + m_flBlockCrushTime)
@@ -1295,6 +1503,26 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 				g_ArrayBlockPlayer[pOther.entindex()].szPlayingSound = m_szBlockSoundName;
 				g_ArrayBlockPlayer[pOther.entindex()].flLastSoundTime = g_Engine.time;
 			}
+		}
+
+		if(m_flBlockPushForce > 0.0)
+		{
+			Vector vDir = pOther.pev.origin - self.pev.origin;
+			vDir = vDir.Normalize();
+			pOther.pev.velocity = vDir * m_flBlockPushForce;
+
+			if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
+
+				g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_BODY, m_szHitSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+
+				g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+			}
+		}
+
+		if(m_flBlockUpForce > 0)
+		{
+			if(pOther.pev.velocity.z < m_flBlockUpForce)
+				pOther.pev.velocity.z = m_flBlockUpForce;
 		}
 	}
 
@@ -1338,13 +1566,13 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 
 		if (self.pev.speed == 0.0)
 		{
-			g_Game.AlertMessage( at_aiconsole, "TRAIN(%1): Speed is 0\n", string(self.pev.targetname));
+			g_Game.AlertMessage( at_aiconsole, "TRACKTRAIN(%1): Speed is 0\n", string(self.pev.targetname));
 			return;
 		}
 
 		if (m_ppath is null)
 		{
-			g_Game.AlertMessage( at_aiconsole, "TRAIN(%1): Lost path\n", string(self.pev.targetname));
+			g_Game.AlertMessage( at_aiconsole, "TRACKTRAIN(%1): Lost path\n", string(self.pev.targetname));
 			return;
 		}
 
@@ -1418,7 +1646,7 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 					if ( pFire.pev.speed != 0 )
 					{
 						self.pev.speed = pFire.pev.speed;
-						g_Game.AlertMessage( at_aiconsole, "TrackTrain %1 speed to %2\n", string(self.pev.targetname), self.pev.speed);
+						g_Game.AlertMessage( at_aiconsole, "TRACKTRAIN (%1) change speed to %2\n", string(self.pev.targetname), self.pev.speed);
 					}
 				}
 			}
@@ -1451,7 +1679,7 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 	{
 		CPathTrack@ pTrack = m_ppath;
 
-		g_Game.AlertMessage( at_aiconsole, "TRAIN \"%1\" dead end\n", string(self.pev.targetname) );
+		g_Game.AlertMessage( at_aiconsole, "TRACKTRAIN (%1) dead end\n", string(self.pev.targetname) );
 
 		if ( pTrack !is null )
 		{
@@ -1486,7 +1714,7 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 
 		if ( pTrack !is null )
 		{
-			g_Game.AlertMessage(at_aiconsole, "TRAIN \"%1\" dead end at %1\n", string(pTrack.pev.targetname));
+			g_Game.AlertMessage(at_aiconsole, "TRACKTRAIN (%1) dead end\n", string(pTrack.pev.targetname));
 
 			if ( !string( pTrack.pev.netname ).IsEmpty() )
 				g_EntityFuncs.FireTargets(string(pTrack.pev.netname), self, self, USE_TOGGLE, 0 );
@@ -1498,7 +1726,7 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 		@m_ppath = cast<CPathTrack@>( g_EntityFuncs.FindEntityByTargetname( null, self.pev.target ) );
 
 		if ( m_ppath is null ){
-			g_Game.AlertMessage( at_error,  "func_track_train %1 found no target\n", string(self.pev.targetname) );
+			g_Game.AlertMessage( at_error,  "TRACKTRAIN (%1) found no target\n", string(self.pev.targetname) );
 			return;
 		}
 
@@ -1506,7 +1734,7 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 
 		if (!pevTarget.ClassNameIs( "path_track" ))
 		{
-			g_Game.AlertMessage( at_error,  "func_track_train %1 must be on a path of path_track\n", string(self.pev.targetname) );
+			g_Game.AlertMessage( at_error,  "TRACKTRAIN (%1) must be on a path of path_track\n", string(self.pev.targetname) );
 			@m_ppath = null;
 			return;
 		}
@@ -1553,12 +1781,13 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 
 		if (pNearest is null)
 		{
-			g_Game.AlertMessage(at_console, "Can't find a nearby track !!!\n");
+			g_Game.AlertMessage(at_console, "TRACKTRAIN (%1): Can't find a nearby track !!!\n", string(self.pev.targetname));
 			SetThink( null );
 			return;
 		}
 
-		g_Game.AlertMessage(at_aiconsole, "TRAIN: %1, Nearest track is %2\n", string(self.pev.targetname), string(pNearest.pev.targetname));
+		g_Game.AlertMessage(at_aiconsole, "TRACKTRAIN (%1), Nearest track is %2\n", string(self.pev.targetname), string(pNearest.pev.targetname));
+
 		@pTrack = cast<CPathTrack@>(pNearest).GetNext();
 
 		if (pTrack !is null)
@@ -1793,23 +2022,57 @@ class CFuncBarrier : ScriptBaseEntity
 	Vector m_vecRight;
 	Vector m_vecForward;
 
-	float m_flPushForce = 0.0;
-	float m_flTouchForce = 0.0;
-	float m_flMaxVelocity = 0.0;
+	float m_flSlideForce = 0.0;
+	float m_flSlideMaxVelocity = 0.0;
+	float m_flBounceForce = 0.0;
 
-	array<string> m_szSoundName(3);
+	array<string> m_szBounceSoundName = {
+		"fallguys/bounce.ogg",
+		"fallguys/bounce2.ogg",
+		"fallguys/bounce3.ogg"
+	};
 
 	void Precache()
 	{
 		BaseClass.Precache();
 		
-		m_szSoundName[0] = "fallguys/bounce.ogg";
-		m_szSoundName[1] = "fallguys/bounce2.ogg";
-		m_szSoundName[2] = "fallguys/bounce3.ogg";
+		g_SoundSystem.PrecacheSound( m_szBounceSoundName[0] );
+		g_SoundSystem.PrecacheSound( m_szBounceSoundName[1] );
+		g_SoundSystem.PrecacheSound( m_szBounceSoundName[2] );
+	}
 
-		g_SoundSystem.PrecacheSound( m_szSoundName[0] );
-		g_SoundSystem.PrecacheSound( m_szSoundName[1] );
-		g_SoundSystem.PrecacheSound( m_szSoundName[2] );
+	bool KeyValue( const string & in szKey, const string & in szValue )
+	{
+		if(szKey == "slideforce"){
+			m_flSlideForce = atof(szValue);
+			return true;
+		}
+		if(szKey == "slidemaxvelocity"){
+			m_flSlideMaxVelocity = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "bounceforce"){
+			m_flBounceForce = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "bouncesound0"){
+			m_szBounceSoundName[0] = szValue;
+			return true;
+		}
+
+		if(szKey == "bouncesound1"){
+			m_szBounceSoundName[1] = szValue;
+			return true;
+		}
+
+		if(szKey == "bouncesound2"){
+			m_szBounceSoundName[2] = szValue;
+			return true;
+		}
+
+		return BaseClass.KeyValue( szKey, szValue );
 	}
 
 	void Spawn()
@@ -1831,101 +2094,84 @@ class CFuncBarrier : ScriptBaseEntity
 		m_vecRight = g_Engine.v_right;
 		m_vecForward = g_Engine.v_forward;
 
-		self.pev.angles = Vector(0.0, 0.0, 0.0);
-	}
-
-	bool KeyValue( const string & in szKey, const string & in szValue )
-	{
-		if(szKey == "pushforce"){
-			m_flPushForce = atof(szValue);
-			return true;
-		}
-
-		if(szKey == "touchforce"){
-			m_flTouchForce = atof(szValue);
-			return true;
-		}
-
-		if(szKey == "maxvelocity"){
-			m_flMaxVelocity = atof(szValue);
-			return true;
-		}
-
-		return BaseClass.KeyValue( szKey, szValue );
+		self.pev.angles = g_vecZero;
 	}
 
 	void Touch( CBaseEntity@ pOther )
 	{
-		if ( pOther is null || !pOther.IsPlayer() || !pOther.IsAlive())
+		if(!pOther.IsPlayer())
+			return;
+			
+		if(!pOther.IsAlive())
 			return;
 
 		if((pOther.pev.flags & FL_ONGROUND) == FL_ONGROUND && (pOther.pev.groundentity is self.edict() ))
 		{
-			Vector vDiff = (pOther.pev.origin - self.pev.origin);
-			vDiff.z = 0;
-			vDiff = vDiff.Normalize();
-
-			if(DotProduct(vDiff, m_vecLeft) > 0)
+			if(m_flSlideForce > 0)
 			{
-				if(m_flMaxVelocity > 0.0 && DotProduct(pOther.pev.velocity, m_vecLeft) > m_flMaxVelocity)
-					return;
+				Vector vDiff = (pOther.pev.origin - self.pev.origin);
+				vDiff.z = 0;
+				vDiff = vDiff.Normalize();
 
-				pOther.pev.basevelocity = m_vecLeft * m_flPushForce;
+				if(DotProduct(vDiff, m_vecLeft) > 0)
+				{
+					if(m_flSlideMaxVelocity > 0 && DotProduct(pOther.pev.velocity, m_vecLeft) > m_flSlideMaxVelocity)
+						return;
 
-				if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
+					pOther.pev.basevelocity = m_vecLeft * m_flSlideForce;
 
-					g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+					if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
 
-					g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+						g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szBounceSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+
+						g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+					}
 				}
-			}
-			else if(DotProduct(vDiff, m_vecRight) > 0)
-			{
-				if(m_flMaxVelocity > 0.0 && DotProduct(pOther.pev.velocity, m_vecRight) > m_flMaxVelocity)
-					return;
+				else if(DotProduct(vDiff, m_vecRight) > 0)
+				{
+					if(m_flSlideMaxVelocity > 0 && DotProduct(pOther.pev.velocity, m_vecRight) > m_flSlideMaxVelocity)
+						return;
 
-				pOther.pev.basevelocity = m_vecRight * m_flPushForce;
+					pOther.pev.basevelocity = m_vecRight * m_flSlideForce;
 
-				if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
-					
-					g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+					if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
+						
+						g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szBounceSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
 
-					g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+						g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+					}
 				}
 			}
 		}
 		else
 		{
-			Vector vDiff = (pOther.pev.origin - self.pev.origin);
-			vDiff.z = 0;
-			vDiff = vDiff.Normalize();
-
-			if(DotProduct(vDiff, m_vecLeft) > 0)
+			if(m_flBounceForce > 0)
 			{
-				if(m_flMaxVelocity > 0.0 && DotProduct(pOther.pev.velocity, m_vecLeft) > m_flMaxVelocity)
-					return;
+				Vector vDiff = (pOther.pev.origin - self.pev.origin);
+				vDiff.z = 0;
+				vDiff = vDiff.Normalize();
 
-				pOther.pev.basevelocity = m_vecLeft * m_flTouchForce;
+				if(DotProduct(vDiff, m_vecLeft) > 0)
+				{
+					g_ArrayBounceVelocityPlayer[pOther.entindex()] = m_vecLeft * m_flBounceForce;
 
-				if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
+					if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
 
-					g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+						g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szBounceSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
 
-					g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+						g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+					}
 				}
-			}
-			else if(DotProduct(vDiff, m_vecRight) > 0)
-			{
-				if(m_flMaxVelocity > 0.0 && DotProduct(pOther.pev.velocity, m_vecRight) > m_flMaxVelocity)
-					return;
+				else if(DotProduct(vDiff, m_vecRight) > 0)
+				{
+					g_ArrayBounceVelocityPlayer[pOther.entindex()] = m_vecRight * m_flBounceForce;
 
-				pOther.pev.basevelocity = m_vecRight * m_flTouchForce;
+					if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
+						
+						g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szBounceSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
 
-				if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
-					
-					g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
-
-					g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+						g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+					}
 				}
 			}
 		}
@@ -1934,23 +2180,21 @@ class CFuncBarrier : ScriptBaseEntity
 
 class CFuncBouncer : ScriptBaseEntity
 {
-	float m_flPushForce = 0.0;
-	float m_flUpForce = 0.0;
-	float m_flMaxVelocity = 0.0;
+	float m_flBounceForce = 0.0;
 
-	array<string> m_szSoundName(3);
+	array<string> m_szBounceSoundName = {
+		"fallguys/bounce.ogg",
+		"fallguys/bounce2.ogg",
+		"fallguys/bounce3.ogg"
+	};
 
 	void Precache()
 	{
 		BaseClass.Precache();
 		
-		m_szSoundName[0] = "fallguys/bounce.ogg";
-		m_szSoundName[1] = "fallguys/bounce2.ogg";
-		m_szSoundName[2] = "fallguys/bounce3.ogg";
-
-		g_SoundSystem.PrecacheSound( m_szSoundName[0] );
-		g_SoundSystem.PrecacheSound( m_szSoundName[1] );
-		g_SoundSystem.PrecacheSound( m_szSoundName[2] );
+		g_SoundSystem.PrecacheSound( m_szBounceSoundName[0] );
+		g_SoundSystem.PrecacheSound( m_szBounceSoundName[1] );
+		g_SoundSystem.PrecacheSound( m_szBounceSoundName[2] );
 	}
 
 	void Spawn()
@@ -1967,6 +2211,162 @@ class CFuncBouncer : ScriptBaseEntity
 
 	bool KeyValue( const string & in szKey, const string & in szValue )
 	{
+		if(szKey == "bounceforce"){
+			m_flBounceForce = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "bouncesound0"){
+			m_szBounceSoundName[0] = szValue;
+			return true;
+		}
+
+		if(szKey == "bouncesound1"){
+			m_szBounceSoundName[1] = szValue;
+			return true;
+		}
+
+		if(szKey == "bouncesound2"){
+			m_szBounceSoundName[2] = szValue;
+			return true;
+		}
+
+		return BaseClass.KeyValue( szKey, szValue );
+	}
+
+	void Touch( CBaseEntity@ pOther )
+	{
+		if(!pOther.IsPlayer())
+			return;
+			
+		if(!pOther.IsAlive())
+			return;
+
+		if((pOther.pev.flags & FL_ONGROUND) == FL_ONGROUND && (pOther.pev.groundentity is self.edict() ))
+		{
+			if(m_flBounceForce > 0.0)
+			{
+				g_ArrayBounceVelocityPlayer[pOther.entindex()] = Vector(0, 0, m_flBounceForce);
+
+				if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
+
+					g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szBounceSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+
+					g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+				}
+			}
+		}
+		else
+		{
+			if(m_flBounceForce > 0.0)
+			{
+				Vector vDiff = pOther.pev.origin - self.pev.origin;
+				vDiff.z = 0;
+				vDiff = vDiff.Normalize();
+
+				g_ArrayBounceVelocityPlayer[pOther.entindex()] = vDiff * m_flBounceForce;
+
+				if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
+
+					g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szBounceSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+
+					g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+				}
+			}
+		}
+	}
+}
+
+class CFuncPendulum2 : ScriptBaseEntity
+{
+	float m_flDistance = 0.0;
+	float m_flConstant = 0.0;
+
+	float m_flBounceForce = 0.0;
+	float m_flPushForce = 0.0;
+	float m_flUpForce = 0.0;
+	float m_flBlockPushForce = 0.0;
+	float m_flBlockUpForce = 0.0;
+	float m_flBlockCrushTime = 4.0;
+
+	array<string> m_szHitSoundName = {
+		"fallguys/impact.ogg",
+		"fallguys/impact2.ogg",
+		"fallguys/impact3.ogg"
+	};
+
+	array<string> m_szBounceSoundName = {
+		"fallguys/bounce.ogg",
+		"fallguys/bounce2.ogg",
+		"fallguys/bounce3.ogg"
+	};
+
+	string m_szBlockSoundName = "fallguys/mecha.ogg";
+
+	void Precache()
+	{
+		BaseClass.Precache();
+
+		g_SoundSystem.PrecacheSound( m_szHitSoundName[0] );
+		g_SoundSystem.PrecacheSound( m_szHitSoundName[1] );
+		g_SoundSystem.PrecacheSound( m_szHitSoundName[2] );
+		
+		g_SoundSystem.PrecacheSound( m_szBounceSoundName[0] );
+		g_SoundSystem.PrecacheSound( m_szBounceSoundName[1] );		
+		g_SoundSystem.PrecacheSound( m_szBounceSoundName[2] );
+
+		g_SoundSystem.PrecacheSound( m_szBlockSoundName );
+	}
+
+	void Spawn()
+	{
+		Precache();
+
+		if ((self.pev.spawnflags & SF_DOOR_PASSABLE) == SF_DOOR_PASSABLE)
+			self.pev.solid = SOLID_NOT;
+		else
+			self.pev.solid = SOLID_BSP;
+
+		self.pev.movetype = MOVETYPE_PUSH;
+
+		g_EntityFuncs.SetModel( self, self.pev.model );
+		g_EntityFuncs.SetSize( self.pev, self.pev.mins, self.pev.maxs );
+		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+
+		if ((self.pev.spawnflags & SF_DOOR_ROTATE_Z) == SF_DOOR_ROTATE_Z)
+			self.pev.movedir = Vector(0.0, 0.0, 1.0);
+		else if ((self.pev.spawnflags & SF_DOOR_ROTATE_X) == SF_DOOR_ROTATE_X)
+			self.pev.movedir = Vector(1.0, 0.0, 0.0);
+		else
+			self.pev.movedir = Vector(0.0, 1.0, 0.0);
+
+		if (self.pev.speed == 0)
+			self.pev.speed = 100;
+
+		m_flConstant = (self.pev.speed * self.pev.speed) * 0.5;
+
+		if(m_flDistance > 90)
+			m_flDistance = 90;
+
+		if(m_flDistance < 10)
+			m_flDistance = 10;
+
+		if ((self.pev.spawnflags & SF_BRUSH_ROTATE_INSTANT) == SF_BRUSH_ROTATE_INSTANT)
+		{
+			g_Game.AlertMessage( at_console, "Starting %1\n", string(self.pev.targetname));
+			
+			NextThink(g_Engine.time + 1.5, false);
+			SetThink(ThinkFunction(this.SUB_CallUseToggle));
+		}
+	}
+
+	bool KeyValue( const string & in szKey, const string & in szValue )
+	{
+		if(szKey == "distance"){
+			m_flDistance = atof(szValue);
+			return true;
+		}
+
 		if(szKey == "pushforce"){
 			m_flPushForce = atof(szValue);
 			return true;
@@ -1977,56 +2377,326 @@ class CFuncBouncer : ScriptBaseEntity
 			return true;
 		}
 
-		if(szKey == "maxvelocity"){
-			m_flMaxVelocity = atof(szValue);			
+		if(szKey == "blockpushforce"){
+			m_flBlockPushForce = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "blockupforce"){
+			m_flBlockUpForce = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "bounceforce"){
+			m_flBounceForce = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "bouncesound0"){
+			m_szBounceSoundName[0] = szValue;
+			return true;
+		}
+
+		if(szKey == "bouncesound1"){
+			m_szBounceSoundName[1] = szValue;
+			return true;
+		}
+
+		if(szKey == "bouncesound2"){
+			m_szBounceSoundName[2] = szValue;
+			return true;
+		}
+
+		if(szKey == "blockcrushtime"){
+			m_flBlockCrushTime = atof(szValue);
 			return true;
 		}
 
 		return BaseClass.KeyValue( szKey, szValue );
 	}
 
-	void Touch( CBaseEntity@ pOther )
+	bool IsRotating()
 	{
-		if ( pOther is null || !pOther.IsPlayer() || !pOther.IsAlive())
-			return;
+		return (self.pev.avelocity.x == 0.0 && self.pev.avelocity.y == 0.0 && self.pev.avelocity.z == 0.0) ? false : true;
+	}
 
-		if((pOther.pev.flags & FL_ONGROUND) == FL_ONGROUND && (pOther.pev.groundentity is self.edict() ))
+	float GetCurrentRotateAngle()
+	{
+		float ang = 0.0;
+		if(self.pev.movedir.x != 0.0) 
 		{
-			if(m_flUpForce > 0.0)
-			{
-				if(m_flMaxVelocity > 0.0 && pOther.pev.velocity.z > m_flMaxVelocity)
-					return;
-
-				pOther.pev.basevelocity.z = m_flUpForce;
-				pOther.pev.flags &= ~FL_ONGROUND;
-
-				if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
-
-					g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
-
-					g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
-				}
-			}
+			ang = self.pev.angles.x;
+		}
+		else if(self.pev.movedir.y != 0.0)
+		{
+			ang = self.pev.angles.y;
 		}
 		else
 		{
+			ang = self.pev.angles.z;
+		}
+		return ang;
+	}
+
+	float GetCurrentRotateDirection()
+	{
+		float vecdir = 0.0;
+		if(self.pev.movedir.x != 0.0) 
+		{
+			vecdir = self.pev.avelocity.x;
+		}
+		else if(self.pev.movedir.y != 0.0)
+		{
+			vecdir = self.pev.avelocity.y;
+		}
+		else
+		{
+			vecdir = self.pev.avelocity.z;
+		}
+		return vecdir;
+	}
+
+	float GetCurrentRotateSpeed()
+	{
+		float speed = 0.0;
+		if(self.pev.movedir.x != 0.0) 
+		{
+			speed = self.pev.avelocity.x;
+		}
+		else if(self.pev.movedir.y != 0.0)
+		{
+			speed = self.pev.avelocity.y;
+		}
+		else
+		{
+			speed = self.pev.avelocity.z;
+		}
+		return abs(speed);
+	}
+
+	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
+	{
+		if(useType == USE_TOGGLE)
+		{
+			if (!IsRotating())
+			{
+				NextThink(self.pev.ltime + 0.1, true);
+				SetThink(ThinkFunction(this.Swing));
+			}
+			else
+			{
+				self.pev.avelocity = g_vecZero;
+				NextThink(self.pev.ltime + 0.1, false);
+				SetThink(ThinkFunction(this.Rotate));
+			}
+		}
+		else if(useType == USE_ON)
+		{
+			g_Game.AlertMessage( at_console, "Turning on %1\n", string(self.pev.targetname));
+
+			if (!IsRotating())
+			{
+				NextThink(self.pev.ltime + 0.1, true);
+				SetThink(ThinkFunction(this.Swing));
+			}
+		}
+		else if(useType == USE_OFF)
+		{
+			//g_Game.AlertMessage( at_console, "Turning Off %1\n", string(self.pev.targetname));
+
+			if (IsRotating())
+			{
+				self.pev.avelocity = g_vecZero;
+				NextThink(self.pev.ltime + 0.1, false);
+				SetThink(ThinkFunction(this.Rotate));
+			}
+		}
+		else if(useType == USE_SET && flValue > 0.0)
+		{
+
+		}
+	}
+
+	void Touch( CBaseEntity@ pOther )
+	{
+		if(!pOther.IsPlayer())
+			return;
+
+		if(!pOther.IsAlive())
+			return;
+
+		if(self.pev.sequence == 1919810)
+		{
 			if(m_flPushForce > 0.0)
+			{
+				Vector vDir = self.pev.vuser1;
+				vDir = vDir.Normalize();
+				pOther.pev.velocity = vDir * m_flPushForce;		
+
+				if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
+
+					if(m_flBounceForce > 0)
+					{
+						g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_BODY, m_szBounceSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+					}
+					else
+					{
+						g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_BODY, m_szHitSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+					}
+					g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+				}
+			}
+
+			if(m_flUpForce > 0)
+			{
+				if(pOther.pev.velocity.z < m_flUpForce)
+					pOther.pev.velocity.z = m_flUpForce;
+			}
+
+			return;
+		}
+
+		if(m_flBounceForce > 0)
+		{
+			if((pOther.pev.flags & FL_ONGROUND) == FL_ONGROUND && (pOther.pev.groundentity is self.edict() ))
+			{
+
+			}
+			else
 			{
 				Vector vDiff = pOther.pev.origin - self.pev.origin;
 				vDiff.z = 0;
 				vDiff = vDiff.Normalize();
 
-				if(m_flMaxVelocity > 0.0 && DotProduct(pOther.pev.velocity, vDiff) > m_flMaxVelocity)
-					return;
-
-				pOther.pev.basevelocity = vDiff * m_flPushForce;
+				g_ArrayBounceVelocityPlayer[pOther.entindex()] = vDiff * m_flBounceForce;
 
 				if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
 
-					g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+					g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szBounceSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
 
 					g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
 				}
+			}
+		}
+	}
+
+	void Blocked( CBaseEntity@ pOther )
+	{
+		if(!pOther.IsPlayer())
+			return;
+			
+		if(!pOther.IsAlive())
+			return;
+
+		if(g_ArrayBlockPlayer[pOther.entindex()].IsBlocking)
+		{
+			if(g_Engine.time > g_ArrayBlockPlayer[pOther.entindex()].flStartBlockTime + m_flBlockCrushTime)
+			{
+				pOther.TakeDamage(self.pev, self.pev, 999999, DMG_CRUSH);
+			}
+			g_ArrayBlockPlayer[pOther.entindex()].flLastBlockTime = g_Engine.time;
+		}
+		else
+		{
+			g_ArrayBlockPlayer[pOther.entindex()].flStartBlockTime = g_Engine.time;
+			g_ArrayBlockPlayer[pOther.entindex()].flLastBlockTime = g_Engine.time;
+			g_ArrayBlockPlayer[pOther.entindex()].IsBlocking = true;
+
+			if(g_Engine.time > g_ArrayBlockPlayer[pOther.entindex()].flLastSoundTime + 1.0){
+				g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_BODY, m_szBlockSoundName, 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+				g_ArrayBlockPlayer[pOther.entindex()].szPlayingSound = m_szBlockSoundName;
+				g_ArrayBlockPlayer[pOther.entindex()].flLastSoundTime = g_Engine.time;
+			}
+		}
+
+		if(m_flBlockPushForce > 0.0)
+		{
+			Vector vDir = pOther.pev.origin - self.pev.origin;
+			vDir = vDir.Normalize();
+			pOther.pev.velocity = vDir * m_flBlockPushForce;
+
+			if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
+
+				g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_BODY, m_szHitSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+
+				g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+			}
+		}
+
+		if(m_flBlockUpForce > 0)
+		{
+			if(pOther.pev.velocity.z < m_flBlockUpForce)
+				pOther.pev.velocity.z = m_flBlockUpForce;
+		}
+	}
+
+	void NextThink(float thinkTime, const bool alwaysThink)
+	{
+		if (alwaysThink)
+			self.pev.flags |= FL_ALWAYSTHINK;
+		else
+			self.pev.flags &= ~FL_ALWAYSTHINK;
+
+		self.pev.nextthink = thinkTime;
+	}
+
+	void SUB_CallUseToggle()
+	{
+		self.Use(self, self, USE_ON, 0.0);
+	}
+
+	void Rotate()
+	{
+		NextThink(self.pev.ltime + 10.0, false);
+		SetThink(ThinkFunction(this.Rotate));
+	}
+
+	void Swing()
+	{
+		NextThink(self.pev.ltime + 0.1, true);
+		SetThink(ThinkFunction(this.Swing));
+
+		float flCurrentAngle = GetCurrentRotateAngle();
+		float flCurrentDirection = GetCurrentRotateDirection();
+
+		float flNewSpeed = sqrt(m_flConstant * (1.0 + cos( flCurrentAngle * (2 * 3.1415926 / 360.0) * (180 / m_flDistance) ) ));
+		
+		//g_Game.AlertMessage( at_console, "Swing %1 flCurrentAngle %2 m_flConstant %3 flNewSpeed %4\n", string(self.pev.targetname), flCurrentAngle, m_flConstant, flNewSpeed);
+
+		if(flCurrentAngle > 0)
+		{
+			if(flCurrentAngle < (m_flDistance - 1))
+			{
+				if(flCurrentDirection > 0)
+				{
+					self.pev.avelocity = self.pev.movedir * flNewSpeed;
+				}
+				else
+				{
+					self.pev.avelocity = self.pev.movedir * -flNewSpeed;
+				}
+			}
+			else
+			{
+				self.pev.avelocity = self.pev.movedir * -flNewSpeed;
+			}			
+		}
+		else
+		{
+			if(flCurrentAngle > -(m_flDistance - 1))
+			{
+				if(flCurrentDirection < 0)
+				{
+					self.pev.avelocity = self.pev.movedir * -flNewSpeed;
+				}
+				else
+				{
+					self.pev.avelocity = self.pev.movedir * flNewSpeed;
+				}
+			}
+			else
+			{
+				self.pev.avelocity = self.pev.movedir * flNewSpeed;
 			}
 		}
 	}
@@ -2996,6 +3666,78 @@ class CTriggerEntityItor2 : ScriptBaseEntity
 	}
 }
 
+class CTriggerEntityItor3 : ScriptBaseEntity
+{
+	string m_szNameStartWith = "";
+	string m_szClassnameFilter = "";
+	int m_iStatusFilter = 0;
+	int m_iTriggerState = 0;
+	float m_flTriggerSetValue = 0.0;
+
+	void Precache()
+	{
+		BaseClass.Precache();
+	}
+
+	void Spawn()
+	{
+		Precache();
+		self.pev.solid = SOLID_NOT;
+		self.pev.movetype = MOVETYPE_NONE;
+
+		g_EntityFuncs.SetModel( self, self.pev.model );
+		g_EntityFuncs.SetSize( self.pev, self.pev.mins, self.pev.maxs );
+		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+	}
+
+	bool KeyValue( const string & in szKey, const string & in szValue )
+	{	
+		if(szKey == "classname_filter"){
+			m_szClassnameFilter = szValue;
+			return true;
+		}
+
+		if(szKey == "name_startwith"){
+			m_szNameStartWith = szValue;
+			return true;
+		}
+
+		if(szKey == "status_filter"){
+			m_iStatusFilter = atoi(szValue);
+			return true;
+		}
+	
+		if(szKey == "triggerstate"){
+			m_iTriggerState = atoi(szValue);
+			return true;
+		}
+	
+		if(szKey == "triggervalue"){
+			m_flTriggerSetValue = atof(szValue);
+			return true;
+		}
+	
+		return BaseClass.KeyValue( szKey, szValue );
+	}
+
+	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
+	{
+		CBaseEntity@ pEntity = null;
+		while((@pEntity = g_EntityFuncs.FindEntityByClassname(pEntity, m_szClassnameFilter)) !is null)
+		{
+			if( string(pEntity.pev.targetname).StartsWith(m_szNameStartWith)){
+
+				if(m_iStatusFilter == 1 && pEntity.pev.deadflag != DEAD_NO)
+					continue;
+				else if(m_iStatusFilter == 2 && pEntity.pev.deadflag == DEAD_NO)
+					continue;
+
+				pEntity.Use( pActivator, self, USE_TYPE(m_iTriggerState), m_flTriggerSetValue );
+			}
+		}
+	}
+}
+
 class CGamePlayerCounter2 : ScriptBaseEntity
 {
 	float m_flDelay = 1.0;
@@ -3174,7 +3916,10 @@ class CTriggerFreeze : ScriptBaseEntity
 	
 	void Touch( CBaseEntity@ pOther )
 	{
-		if ( pOther is null || !pOther.IsPlayer() || !pOther.IsAlive())
+		if(!pOther.IsPlayer())
+			return;
+			
+		if(!pOther.IsAlive())
 			return;
 
 		CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pOther);
@@ -3303,9 +4048,10 @@ HookReturnCode PlayerAddToFullPack( entity_state_t@ state, int e, edict_t @ent, 
 			}
 			else
 			{
+				//trigger_camera or something
+
 				float distance = (ent.vars.origin - viewEnt.vars.origin).Length();
 
-				//trigger_camera or something
 				if(distance > 1000.0)
 				{
 					state.modelindex = g_iPlayerArrowSprite2ModelIndex;
@@ -3318,7 +4064,6 @@ HookReturnCode PlayerAddToFullPack( entity_state_t@ state, int e, edict_t @ent, 
 				}
 				else if(distance > 300.0)
 				{
-					state.modelindex = g_iPlayerArrowSprite2ModelIndex;
 					state.scale = 0.15 + 0.6 * (distance - 300.0) / 700.0;
 				}
 				else
@@ -3349,6 +4094,11 @@ HookReturnCode PlayerKilled( CBasePlayer@ pPlayer, CBaseEntity@ pAttacker, int i
 	//NetworkMessage message( MSG_ONE, NetworkMessages::NetworkMessageType(146), pPlayer.edict() );
 	//message.WriteByte(1);
 	//message.End();
+
+	//pPlayer.GetObserver().StartObserver( pPlayer.pev.origin, pPlayer.pev.angles, false );
+	//pPlayer.GetObserver().SetMode(OBS_ROAMING);
+	//pPlayer.GetObserver().SetObserverModeControlEnabled(true);
+	//pPlayer.SetMaxSpeedOverride( -1 );
 
     return HOOK_HANDLED;
 }
@@ -3501,11 +4251,19 @@ HookReturnCode PlayerPreThink(CBasePlayer@ pPlayer, uint& out uiFlags)
 	if(pPlayer is null || !pPlayer.IsConnected())
 		return HOOK_CONTINUE;
 
+	int playerIndex = pPlayer.entindex();
+
 	if(pPlayer.IsAlive())
 	{
 		if((pPlayer.pev.button & IN_JUMP) == IN_JUMP && (pPlayer.pev.oldbuttons & IN_JUMP) == 0)
 		{
 			PlayerJump(pPlayer);
+		}
+
+		if(g_ArrayBounceVelocityPlayer[playerIndex] != g_vecZero)
+		{
+			pPlayer.pev.velocity = pPlayer.pev.velocity + g_ArrayBounceVelocityPlayer[playerIndex];
+			g_ArrayBounceVelocityPlayer[playerIndex] = g_vecZero;
 		}
 	}
 
@@ -3517,8 +4275,10 @@ HookReturnCode PlayerPostThink(CBasePlayer@ pPlayer)
 	if(pPlayer is null || !pPlayer.IsConnected())
 		return HOOK_CONTINUE;
 
-	if(g_ArrayBlockPlayer[pPlayer.entindex()].IsBlocking &&
-		g_Engine.time > g_ArrayBlockPlayer[pPlayer.entindex()].flLastBlockTime + 0.1)
+	int playerIndex = pPlayer.entindex();
+
+	if(g_ArrayBlockPlayer[playerIndex].IsBlocking &&
+		g_Engine.time > g_ArrayBlockPlayer[playerIndex].flLastBlockTime + 0.1)
 	{
 		PlayerStopBlock(pPlayer);
 	}
@@ -3535,6 +4295,8 @@ HookReturnCode PlayerPostThink(CBasePlayer@ pPlayer)
 	if(pPlayer.IsAlive())
 	{
 		pPlayer.m_iWeaponVolume = LOUD_GUN_VOLUME;
+
+
 
 		if((pPlayer.pev.flags & FL_ONGROUND) == 0)
 		{
@@ -3662,9 +4424,15 @@ const bool doCommand(CBasePlayer@ plr, const CCommand@ args, bool inConsole) {
 		}
 		return true;
   }
-  else if (args.ArgC() == 1 && (args[0] == ".fgtest" || args[0] == "fgtest")) {
+  else if (args.ArgC() == 1 && (args[0] == ".fgtest1" || args[0] == "fgtest1")) {
 
 		plr.pev.origin = Vector(-1923, -978, 1049);
+
+		return true;
+  }
+  else if (args.ArgC() == 1 && (args[0] == ".fgtest2" || args[0] == "fgtest2")) {
+
+		plr.pev.origin = Vector(-5967, -1967, -1999);
 
 		return true;
   }
@@ -3692,6 +4460,7 @@ void MapInit()
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerRandomCounter", "trigger_random_counter" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerRandomMultiple", "trigger_random_multiple" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerEntityItor2", "trigger_entity_itor2" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerEntityItor3", "trigger_entity_itor3" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CGamePlayerCounter2", "game_player_counter2" );
 	
 	//Solid entity
@@ -3701,6 +4470,7 @@ void MapInit()
 	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncLever", "func_lever" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncBarrier", "func_barrier" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncBouncer", "func_bouncer" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncPendulum2", "func_pendulum2" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerFreeze", "trigger_freeze" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerFindBrush", "trigger_findbrush" );
 
