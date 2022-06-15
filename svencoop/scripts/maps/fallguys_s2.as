@@ -39,6 +39,12 @@ const int SF_DOOR_ROTATE_X = 128;
 const int SF_DOOR_USE_ONLY = 256;
 const int SF_DOOR_NOMONSTERS = 512;
 
+const int TASKSTATUS_NEW				= 0;			// Just started
+const int TASKSTATUS_RUNNING			= 1;			// Running task & movement
+const int TASKSTATUS_RUNNING_MOVEMENT	= 2;			// Just running movement
+const int TASKSTATUS_RUNNING_TASK		= 3;			// Just running task
+const int TASKSTATUS_COMPLETE			= 4;			// Completed, get next task
+
 class CPlayerBlockStateItem
 {
 	CPlayerBlockStateItem(){
@@ -67,6 +73,7 @@ array<string> g_ArrayFallingPlayerPlayingSound(33);
 array<EHandle> g_ArrayArrowEntityPlayer(33);
 
 array<string> g_szPlayerJumpSound(8);
+array<string> g_szPlayerHitSound(7);
 array<string> g_szPlayerFallingSound(2);
 
 const string g_szPlayerGrabSound = "fallguys/grab.ogg";
@@ -155,6 +162,41 @@ class CEnvStudioModel : ScriptBaseEntity
 		return BaseClass.KeyValue( szKey, szValue );
 	}
 
+	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
+	{
+		if(useType == USE_SET)
+		{
+			if((self.pev.spawnflags & 4) == 4)
+			{
+				self.pev.skin = int(flValue);
+			}
+			if((self.pev.spawnflags & 8) == 8)
+			{
+				self.pev.body = int(flValue);
+			}
+			if((self.pev.spawnflags & 16) == 16)
+			{
+				self.pev.framerate = 0.0;
+				self.pev.renderfx = kRenderFxExplode;
+				self.pev.nextthink = g_Engine.time + flValue;
+				if(m_CopyFromEntity is null)
+				{
+					SetThink(ThinkFunction(this.RestoreFx));
+				}
+				else
+				{
+					SetThink(ThinkFunction(this.RestoreFxAnimate));
+				}
+			}
+		}
+	}
+
+	void RestoreFx()
+	{
+		self.pev.renderfx = 0;
+		self.pev.framerate = 1.0;
+	}
+
 	void Animate()
 	{
 		//g_Game.AlertMessage( at_console, "Animate %1", string(self.pev.target));
@@ -185,7 +227,19 @@ class CEnvStudioModel : ScriptBaseEntity
 			self.pev.angles = self.pev.angles + m_AnglesOffset;
 		}
 
+		if((self.pev.spawnflags & 32) == 32)
+		{
+			self.pev.origin.z = m_CopyFromEntity.pev.origin.z;
+			self.pev.origin = self.pev.origin + m_OriginOffset;
+		}	
+
 		self.pev.nextthink = g_Engine.time;
+	}
+
+	void RestoreFxAnimate()
+	{
+		RestoreFx();
+		Animate();
 	}
 }
 
@@ -203,6 +257,11 @@ class CFuncRotatingFg : ScriptBaseEntity
 	float m_flDynamicForce = 0.0;
 	float m_flBlockCrushTime = 4.0;
 
+	float m_flBounceDrumForce = 0.0;
+	float m_flBounceDrumPitch = 0.0;
+	string m_szBounceDrumStudioModel = "";
+	float m_flLastBounceTime = 0.0;
+
 	array<string> m_szHitSoundName = {
 		"fallguys/impact1.ogg",
 		"fallguys/impact2.ogg",
@@ -211,6 +270,12 @@ class CFuncRotatingFg : ScriptBaseEntity
 
 	string m_szBlockSoundName = "fallguys/mecha.ogg";
 	string m_szSlideSoundName = "fallguys/slide.ogg";
+
+	array<string> m_szBounceSoundName = {
+		"fallguys/bounce.ogg",
+		"fallguys/bounce2.ogg",
+		"fallguys/bounce3.ogg"
+	};
 
 	void Precache()
 	{
@@ -222,6 +287,25 @@ class CFuncRotatingFg : ScriptBaseEntity
 
 		g_SoundSystem.PrecacheSound( m_szBlockSoundName );
 		g_SoundSystem.PrecacheSound( m_szSlideSoundName );
+	}
+
+	void Restart()
+	{
+		self.pev.speed = m_flInitialSpeed;
+
+		self.pev.angles = g_vecZero;
+		self.pev.avelocity = g_vecZero;
+
+		if ((self.pev.spawnflags & SF_BRUSH_ROTATE_INSTANT) == SF_BRUSH_ROTATE_INSTANT)
+		{
+			NextThink(self.pev.ltime + 1.5, false);
+			SetThink(ThinkFunction(this.SUB_CallUseToggle));
+		}
+		else
+		{
+			NextThink(self.pev.ltime + 10.0, false);
+			SetThink(ThinkFunction(this.Rotate));
+		}
 	}
 
 	void Spawn()
@@ -310,6 +394,21 @@ class CFuncRotatingFg : ScriptBaseEntity
 			return true;
 		}
 
+		if(szKey == "bouncedrumforce"){
+			m_flBounceDrumForce = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "bouncedrumpitch"){
+			m_flBounceDrumPitch = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "bouncedrumstudio"){
+			m_szBounceDrumStudioModel = szValue;
+			return true;
+		}
+
 		if(szKey == "hitsound0"){
 			m_szHitSoundName[0] = szValue;
 			return true;
@@ -322,6 +421,21 @@ class CFuncRotatingFg : ScriptBaseEntity
 
 		if(szKey == "hitsound2"){
 			m_szHitSoundName[2] = szValue;
+			return true;
+		}
+
+		if(szKey == "bouncesound0"){
+			m_szBounceSoundName[0] = szValue;
+			return true;
+		}
+
+		if(szKey == "bouncesound2"){
+			m_szBounceSoundName[1] = szValue;
+			return true;
+		}
+
+		if(szKey == "bouncesound2"){
+			m_szBounceSoundName[2] = szValue;
 			return true;
 		}
 
@@ -443,6 +557,11 @@ class CFuncRotatingFg : ScriptBaseEntity
 					}
 				}
 			}
+			else if(useType == USE_SET && flValue < 0.0)
+			{
+				Restart();
+				return;
+			}
 		}
 		else
 		{
@@ -500,6 +619,11 @@ class CFuncRotatingFg : ScriptBaseEntity
 					}
 				}
 			}
+			else if(useType == USE_SET && flValue < 0.0)
+			{
+				Restart();
+				return;
+			}
 		}
 	}
 
@@ -538,6 +662,8 @@ class CFuncRotatingFg : ScriptBaseEntity
 				if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
 
 					g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_BODY, m_szHitSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+
+					pOther.TakeDamage( self.pev, self.pev, 1, DMG_SLASH );
 
 					g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
 				}
@@ -578,6 +704,31 @@ class CFuncRotatingFg : ScriptBaseEntity
 
 		if((self.pev.spawnflags & (SF_BRUSH_ROTATE_Z_AXIS | SF_BRUSH_ROTATE_X_AXIS)) == 0)
 		{
+			if(m_flBounceDrumForce > 0)
+			{
+				if(g_Engine.time > m_flLastBounceTime){
+
+					Vector vBounceAngles = self.pev.angles;
+
+					vBounceAngles.x = -m_flBounceDrumPitch;
+
+					Math.MakeVectors( vBounceAngles );
+
+					Vector vecBounceVector = g_Engine.v_forward;
+
+					g_ArrayBounceVelocityPlayer[pOther.entindex()] = vecBounceVector * m_flBounceDrumForce;
+
+					g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szBounceSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+
+					if(!m_szBounceDrumStudioModel.IsEmpty())
+					{
+						g_EntityFuncs.FireTargets( m_szBounceDrumStudioModel, self, self, USE_SET, 0.075 );
+					}
+
+					m_flLastBounceTime = g_Engine.time + 0.5;
+				}
+			}
+
 			if(m_flSlideForce > 0)
 			{
 				float flForce = CalcDynamicForce(m_flSlideForce);
@@ -676,6 +827,8 @@ class CFuncRotatingFg : ScriptBaseEntity
 			{
 				g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_BODY, m_szHitSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
 
+				pOther.TakeDamage( self.pev, self.pev, 1, DMG_SLASH );
+
 				g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
 			}
 		}
@@ -754,6 +907,9 @@ class CFuncTrainFg : ScriptBaseEntity
 	Vector m_vecSaveOrigin;
 	CBaseEntity @m_pSaveTarget = null;
 	CBaseEntity @m_pCurrentTarget = null;
+	float m_flInitialSpeed = 0;
+	string m_szInitialTarget = "";
+	int m_iInitialSpawnFlags = 0;
 	bool m_activated = false;
 	
 	float m_flBounceForce = 0.0;
@@ -869,14 +1025,28 @@ class CFuncTrainFg : ScriptBaseEntity
 
 	void Restart()
 	{
-		if (self.pev.speed == 0)
-			self.pev.speed = 100;
-
+		self.pev.speed = m_flInitialSpeed;
 		self.pev.movetype = MOVETYPE_PUSH;
+		self.pev.spawnflags = m_iInitialSpawnFlags;
+
+		if ((self.pev.spawnflags & SF_TRAIN_PASSABLE) == SF_TRAIN_PASSABLE)
+			self.pev.solid = SOLID_NOT;
+		else
+			self.pev.solid = SOLID_BSP;
+
+		if(!m_szInitialTarget.IsEmpty())
+			self.pev.target = m_szInitialTarget;
+
 		@m_pCurrentTarget = @m_pSaveTarget;
+
 		g_EntityFuncs.SetOrigin(self, m_vecSaveOrigin);
 
+		self.pev.nextthink = 0;
+		self.pev.velocity = g_vecZero;
+
 		m_activated = false;
+
+		Activate();
 	}
 
 	void Spawn()
@@ -885,6 +1055,10 @@ class CFuncTrainFg : ScriptBaseEntity
 
 		if (self.pev.speed == 0)
 			self.pev.speed = 100;
+
+		m_flInitialSpeed = self.pev.speed;
+		m_szInitialTarget = string(self.pev.target);
+		m_iInitialSpawnFlags = self.pev.spawnflags;
 
 		if (string(self.pev.target).IsEmpty())
 			g_Game.AlertMessage( at_console, "FuncTrain %1 with no target", string(self.pev.targetname));
@@ -940,6 +1114,8 @@ class CFuncTrainFg : ScriptBaseEntity
 					else
 					{
 						g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_BODY, m_szHitSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+						
+						pOther.TakeDamage( self.pev, self.pev, 1, DMG_SLASH );
 					}
 					g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
 				}
@@ -1017,6 +1193,8 @@ class CFuncTrainFg : ScriptBaseEntity
 
 				g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_BODY, m_szHitSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
 
+				pOther.TakeDamage( self.pev, self.pev, 1, DMG_SLASH );
+
 				g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
 			}
 		}
@@ -1067,7 +1245,6 @@ class CFuncTrainFg : ScriptBaseEntity
 				return;
 			}
 		}
-
 	}
 
 	void NextThink(float thinkTime, const bool alwaysThink)
@@ -1085,8 +1262,15 @@ class CFuncTrainFg : ScriptBaseEntity
 		if (!m_activated)
 		{
 			m_activated = true;
-			CBaseEntity @pTarget = g_EntityFuncs.FindEntityByTargetname( null, self.pev.target );
 			
+			if(string(self.pev.target).IsEmpty())
+				return;
+
+			CBaseEntity @pTarget = g_EntityFuncs.FindEntityByTargetname( null, self.pev.target );
+
+			if(pTarget is null)
+				return;
+
 			self.pev.target = pTarget.pev.target;
 			@m_pCurrentTarget = @pTarget;
 			g_EntityFuncs.SetOrigin(self, pTarget.pev.origin - (self.pev.mins + self.pev.maxs) * 0.5);
@@ -1464,6 +1648,8 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 
 					g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_BODY, m_szHitSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
 
+					pOther.TakeDamage( self.pev, self.pev, 1, DMG_SLASH );
+
 					g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
 				}
 			}
@@ -1514,6 +1700,8 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 			if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
 
 				g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_BODY, m_szHitSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+
+				pOther.TakeDamage( self.pev, self.pev, 1, DMG_SLASH );
 
 				g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
 			}
@@ -2277,6 +2465,144 @@ class CFuncBouncer : ScriptBaseEntity
 	}
 }
 
+class CFuncBounceDrum : ScriptBaseEntity
+{
+	float m_flBounceForce = 0.0;
+	Vector m_vecBounceVector = Vector(0, 0, 1);
+	float m_flLastBounceTime = 0.0;
+
+	array<string> m_szBounceSoundName = {
+		"fallguys/bounce.ogg",
+		"fallguys/bounce2.ogg",
+		"fallguys/bounce3.ogg"
+	};
+
+	void Precache()
+	{
+		BaseClass.Precache();
+		
+		g_SoundSystem.PrecacheSound( m_szBounceSoundName[0] );
+		g_SoundSystem.PrecacheSound( m_szBounceSoundName[1] );
+		g_SoundSystem.PrecacheSound( m_szBounceSoundName[2] );
+	}
+
+	void Spawn()
+	{
+		Precache();
+
+		self.pev.solid = SOLID_BSP;
+		self.pev.movetype = MOVETYPE_PUSH;
+
+		g_EntityFuncs.SetModel( self, self.pev.model );
+		g_EntityFuncs.SetSize( self.pev, self.pev.mins, self.pev.maxs );
+		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+	}
+
+	bool KeyValue( const string & in szKey, const string & in szValue )
+	{
+		if(szKey == "bounceforce"){
+			m_flBounceForce = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "bounceangles"){
+			Vector angles;
+			g_Utility.StringToVector( angles, szValue );
+
+			Math.MakeVectors( angles );
+
+			m_vecBounceVector = g_Engine.v_forward;
+			return true;
+		}
+
+		if(szKey == "bouncesound0"){
+			m_szBounceSoundName[0] = szValue;
+			return true;
+		}
+
+		if(szKey == "bouncesound1"){
+			m_szBounceSoundName[1] = szValue;
+			return true;
+		}
+
+		if(szKey == "bouncesound2"){
+			m_szBounceSoundName[2] = szValue;
+			return true;
+		}
+
+		return BaseClass.KeyValue( szKey, szValue );
+	}
+
+	void Touch( CBaseEntity@ pOther )
+	{
+		if(!pOther.IsPlayer())
+			return;
+			
+		if(!pOther.IsAlive())
+			return;
+
+		if((pOther.pev.flags & FL_ONGROUND) == FL_ONGROUND && (pOther.pev.groundentity is self.edict() ))
+		{
+			if(m_flBounceForce > 0.0)
+			{
+				g_ArrayBounceVelocityPlayer[pOther.entindex()] = m_vecBounceVector* m_flBounceForce;
+
+				if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
+
+					g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szBounceSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+
+					g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+				}
+
+				if(g_Engine.time > m_flLastBounceTime){
+
+					if(!string(self.pev.target).IsEmpty())
+					{
+						g_EntityFuncs.FireTargets( self.pev.target, self, self, USE_SET, 0.075 );
+					}
+
+					m_flLastBounceTime = g_Engine.time + 0.5;
+				}
+			}
+		}
+		else
+		{
+			if(m_flBounceForce > 0.0)
+			{
+				g_ArrayBounceVelocityPlayer[pOther.entindex()] = m_vecBounceVector* m_flBounceForce;
+				
+				//Vector vDiff = pOther.pev.origin - self.pev.origin;
+				//vDiff.z = 0;
+				//vDiff = vDiff.Normalize();
+
+				//g_ArrayBounceVelocityPlayer[pOther.entindex()] = vDiff * m_flBounceForce;
+
+				if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
+
+					g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szBounceSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+
+					g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+				}
+
+				if(g_Engine.time > m_flLastBounceTime){
+
+					if(!string(self.pev.target).IsEmpty())
+					{
+						g_EntityFuncs.FireTargets( self.pev.target, self, self, USE_SET, 0.075 );
+					}
+
+					m_flLastBounceTime = g_Engine.time + 0.5;
+				}
+			}
+		}
+	}
+
+	void RestoreAnim()
+	{
+		
+	}
+}
+
 class CFuncPendulum2 : ScriptBaseEntity
 {
 	float m_flDistance = 0.0;
@@ -2542,6 +2868,7 @@ class CFuncPendulum2 : ScriptBaseEntity
 					else
 					{
 						g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_BODY, m_szHitSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+						pOther.TakeDamage( self.pev, self.pev, 1, DMG_SLASH );
 					}
 					g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
 				}
@@ -2618,6 +2945,8 @@ class CFuncPendulum2 : ScriptBaseEntity
 			if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
 
 				g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_BODY, m_szHitSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+
+				pOther.TakeDamage( self.pev, self.pev, 1, DMG_SLASH );
 
 				g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
 			}
@@ -2975,6 +3304,11 @@ class CTriggerHUDCountdown : ScriptBaseEntity
 
 			m_nCurrentAccum += 1;
 			m_nCurrentCount -= 1;
+
+			if(!string(self.pev.target).IsEmpty())
+			{
+				g_EntityFuncs.FireTargets( self.pev.target, self, self, USE_SET, float(m_nCurrentCount) );
+			}
 
 			self.pev.nextthink = g_Engine.time + 1.0;
 		}
@@ -3596,10 +3930,11 @@ class CTriggerRandomMultiple : ScriptBaseEntity
 
 class CTriggerEntityItor2 : ScriptBaseEntity
 {
-	string m_szNameStartWith = "";
+	string m_szNameFilter = "";
 	string m_szClassnameFilter = "";
 	int m_iStatusFilter = 0;
 	int m_iTriggerState = 0;
+	float m_flTriggerValue = 0.0;
 
 	void Precache()
 	{
@@ -3619,13 +3954,13 @@ class CTriggerEntityItor2 : ScriptBaseEntity
 
 	bool KeyValue( const string & in szKey, const string & in szValue )
 	{	
-		if(szKey == "classname_filter"){
-			m_szClassnameFilter = szValue;
+		if(szKey == "name_filter"){
+			m_szNameFilter = szValue;
 			return true;
 		}
 
-		if(szKey == "name_startwith"){
-			m_szNameStartWith = szValue;
+		if(szKey == "classname_filter"){
+			m_szClassnameFilter = szValue;
 			return true;
 		}
 
@@ -3639,27 +3974,41 @@ class CTriggerEntityItor2 : ScriptBaseEntity
 			return true;
 		}
 	
+		if(szKey == "triggervalue"){
+			m_flTriggerValue = atoi(szValue);
+			return true;
+		}
 		return BaseClass.KeyValue( szKey, szValue );
 	}
 
 	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
 	{
-		CBaseEntity@ pTarget = g_EntityFuncs.FindEntityByTargetname(null, self.pev.target);
-		if(pTarget !is null)
+		if(m_szNameFilter.IsEmpty())
 		{
 			CBaseEntity@ pEntity = null;
 			while((@pEntity = g_EntityFuncs.FindEntityByClassname(pEntity, m_szClassnameFilter)) !is null)
 			{
-				if( string(pEntity.pev.targetname).StartsWith(m_szNameStartWith)){
+				if(m_iStatusFilter == 1 && pEntity.pev.deadflag != DEAD_NO)
+					continue;
+				else if(m_iStatusFilter == 2 && pEntity.pev.deadflag == DEAD_NO)
+					continue;
+
+				g_EntityFuncs.FireTargets( self.pev.target, pEntity, self, USE_TYPE(m_iTriggerState), m_flTriggerValue );
+			}
+		}
+		else
+		{
+			CBaseEntity@ pEntity = null;
+			while((@pEntity = g_EntityFuncs.FindEntityByClassname(pEntity, m_szClassnameFilter)) !is null)
+			{
+				if( m_szNameFilter == string(pEntity.pev.targetname) ){
 
 					if(m_iStatusFilter == 1 && pEntity.pev.deadflag != DEAD_NO)
 						continue;
 					else if(m_iStatusFilter == 2 && pEntity.pev.deadflag == DEAD_NO)
 						continue;
 
-					//!activator is not working with trigger_respawn so we have to redirect pev.target to targetname of found entities
-					pTarget.pev.target = pEntity.pev.targetname;
-					g_EntityFuncs.FireTargets( self.pev.target, pEntity, pEntity, USE_TYPE(m_iTriggerState) );
+					g_EntityFuncs.FireTargets( self.pev.target, pEntity, self, USE_TYPE(m_iTriggerState), m_flTriggerValue );
 				}
 			}
 		}
@@ -3672,7 +4021,7 @@ class CTriggerEntityItor3 : ScriptBaseEntity
 	string m_szClassnameFilter = "";
 	int m_iStatusFilter = 0;
 	int m_iTriggerState = 0;
-	float m_flTriggerSetValue = 0.0;
+	float m_flTriggerValue = 0.0;
 
 	void Precache()
 	{
@@ -3713,7 +4062,7 @@ class CTriggerEntityItor3 : ScriptBaseEntity
 		}
 	
 		if(szKey == "triggervalue"){
-			m_flTriggerSetValue = atof(szValue);
+			m_flTriggerValue = atof(szValue);
 			return true;
 		}
 	
@@ -3732,7 +4081,7 @@ class CTriggerEntityItor3 : ScriptBaseEntity
 				else if(m_iStatusFilter == 2 && pEntity.pev.deadflag == DEAD_NO)
 					continue;
 
-				pEntity.Use( pActivator, self, USE_TYPE(m_iTriggerState), m_flTriggerSetValue );
+				pEntity.Use( pActivator, self, USE_TYPE(m_iTriggerState), m_flTriggerValue );
 			}
 		}
 	}
@@ -3806,6 +4155,66 @@ class CGamePlayerCounter2 : ScriptBaseEntity
 		} else {
 			NextThink(g_Engine.time + 0.0, true);
 			SetThink(ThinkFunction(this.CounterThink));
+		}
+	}
+}
+
+class CTriggerRelay2 : ScriptBaseEntity
+{
+	int m_iTriggerState = 0;
+	float m_flTriggerValue = 0.0;
+
+	void Precache()
+	{
+		BaseClass.Precache();
+	}
+
+	void Spawn()
+	{
+		Precache();
+		self.pev.solid = SOLID_NOT;
+		self.pev.movetype = MOVETYPE_NONE;
+
+		g_EntityFuncs.SetModel( self, self.pev.model );
+		g_EntityFuncs.SetSize( self.pev, self.pev.mins, self.pev.maxs );
+		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+	}
+
+	bool KeyValue( const string & in szKey, const string & in szValue )
+	{
+		if(szKey == "triggerstate"){
+			m_iTriggerState = atoi(szValue);
+			return true;
+		}
+	
+		if(szKey == "triggervalue"){
+			m_flTriggerValue = atof(szValue);
+			return true;
+		}
+
+		return BaseClass.KeyValue( szKey, szValue );
+	}
+
+	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
+	{
+		if(useType == USE_ON)
+		{
+			self.pev.spawnflags |= 1;
+		}
+		else if(useType == USE_OFF)
+		{
+			self.pev.spawnflags &= ~1;
+		}
+		else if(useType == USE_TOGGLE)
+		{
+			if((self.pev.spawnflags & 1) == 1)
+			{
+				g_EntityFuncs.FireTargets( self.pev.target, pActivator, self, USE_TYPE(m_iTriggerState), m_flTriggerValue );
+			}
+			else
+			{
+				//or what
+			}
 		}
 	}
 }
@@ -3886,7 +4295,7 @@ class CTriggerFindBrush : ScriptBaseEntity
 
 			g_EntityFuncs.FireTargets( self.pev.target, brushes[i], self, useType );
 
-			g_Game.AlertMessage( at_console, "Triggering target %1\n", brushes[i].pev.classname);
+			//g_Game.AlertMessage( at_console, "Triggering target %1\n", brushes[i].pev.classname);
 		}
 	}
 }
@@ -3994,6 +4403,345 @@ class CTriggerFreeze : ScriptBaseEntity
 	}
 }
 
+const int RHINO_LOAD_ATTACK = 1;
+const int RHINO_DO_ATTACK = 2;
+const int RHINO_END_ATTACK = 3;
+const int RHINO_LOAD_DASH = 4;
+const int RHINO_DO_DASH = 5;
+
+class CMonsterRhino : ScriptBaseMonsterEntity
+{
+	int m_iSpriteTexture = 0;
+	bool m_bIsDashing = false;
+	Vector m_vecDashDir;
+	Vector m_vecDashTarget;
+
+	void Precache()
+	{
+		BaseClass.Precache();
+
+		g_Game.PrecacheModel("models/fallguys/rhino.mdl");
+
+		g_SoundSystem.PrecacheSound("fallguys/rhinoidle.ogg");
+		g_SoundSystem.PrecacheSound("fallguys/rhinoattack.ogg");
+		g_SoundSystem.PrecacheSound("fallguys/rhinoloadattack.ogg");
+		g_SoundSystem.PrecacheSound("fallguys/rhinoendattack.ogg");
+		
+		m_iSpriteTexture = g_Game.PrecacheModel("sprites/boom.spr");
+	}
+	
+	void Spawn()
+	{
+		Precache();
+
+		if( !self.SetupModel() )
+			g_EntityFuncs.SetModel( self, "models/fallguys/rhino.mdl" );
+			
+		g_EntityFuncs.SetSize(self.pev, Vector(-112, -112, 0), Vector(112, 112, 140));
+		
+		self.pev.solid = SOLID_SLIDEBOX;
+		self.pev.movetype = MOVETYPE_STEP;
+		self.pev.flags |= FL_MONSTERCLIP;
+		
+		self.m_bloodColor			= BLOOD_COLOR_RED;
+		self.m_flFieldOfView		= 0.5;
+		self.m_MonsterState			= MONSTERSTATE_NONE;
+		self.m_afCapability			= bits_CAP_DOORS_GROUP;
+		
+		self.m_FormattedName		= "Rhino";
+
+		self.MonsterInit();
+
+		//self.SetPlayerAlly( true ); 
+	}
+	
+	int	Classify()
+	{
+		return self.GetClassification( CLASS_ALIEN_MONSTER );
+	}
+	
+	void SetYawSpeed()
+	{
+		switch ( self.m_Activity )
+		{
+			case ACT_RANGE_ATTACK1:
+				self.pev.yaw_speed = 0;
+				break;
+
+			default:
+				self.pev.yaw_speed = 60;
+				break;
+		}
+	}
+	
+	void Killed(entvars_t@ pevAttacker, int iGib)
+	{
+		BaseClass.Killed(pevAttacker, iGib);
+	}
+	
+	void DeathSound()
+	{
+		
+	}
+	
+	void PainSound()
+	{	
+	
+	}
+	
+	void AlertSound()
+	{	
+	
+	}
+	
+	void AttackSound()
+	{
+
+	}
+
+	int TakeDamage( entvars_t@ pevInflictor, entvars_t@ pevAttacker, float flDamage, int bitsDamageType)
+	{	
+		return 0;
+	}
+	
+	bool CheckMeleeAttack1( float flDot, float flDist )
+	{
+		if(m_bIsDashing)
+			return false;
+
+		if (flDot >= 0.7)
+		{
+			if (flDist <= 150)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	bool CheckMeleeAttack2( float flDot, float flDist )
+	{
+		return false;
+	}
+
+	bool CheckRangeAttack1(float flDot, float flDist)
+	{	
+		if(m_bIsDashing)
+			return false;
+
+		if (flDot >= 0.86)
+		{
+			if (flDist >= 400)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	bool CheckRangeAttack2(float flDot, float flDist)
+	{	
+		return false;
+	}
+
+	void LoadMeleeAttack()
+	{
+		g_SoundSystem.EmitSoundDyn( self.edict(), CHAN_WEAPON, "fallguys/rhinoloadattack.ogg", 1, ATTN_NORM, 0, PITCH_NORM );
+	}
+
+	void DoMeleeAttack()
+	{
+		g_SoundSystem.EmitSoundDyn( self.edict(), CHAN_STATIC, "fallguys/rhinoattack.ogg", 1, ATTN_NORM, 0, PITCH_NORM );
+
+		Vector vecSrc = self.pev.origin;
+
+		Vector dir = GetAimDir(self);
+		
+		Vector vecTarget = vecSrc + dir * 100.0;
+
+		vecTarget.z += 50;
+
+		CBaseEntity@ pEntity = null;
+		
+		while((@pEntity = g_EntityFuncs.FindEntityInSphere(pEntity, vecTarget, 100.0, "player", "classname")) !is null)
+		{
+			CBasePlayer@ pPlayer = cast<CBasePlayer@>(pEntity);
+			if(pPlayer.IsAlive())
+			{
+				pPlayer.TakeDamage( self.pev, self.pev, 1, DMG_SLASH );
+
+				pPlayer.pev.velocity = pPlayer.pev.velocity + g_Engine.v_forward * self.pev.frags * 0.6;
+				pPlayer.pev.velocity = pPlayer.pev.velocity + g_Engine.v_up * self.pev.frags * 0.4;
+			}
+		}
+
+		self.m_flNextAttack = g_Engine.time + 2.0;
+	}
+	
+	void EndMeleeAttack()
+	{
+		g_SoundSystem.EmitSoundDyn( self.edict(), CHAN_WEAPON, "fallguys/rhinoendattack.ogg", 1, ATTN_NORM, 0, PITCH_NORM );
+	}
+
+	void LoadDash()
+	{
+		m_bIsDashing = false;
+
+		g_SoundSystem.EmitSoundDyn( self.edict(), CHAN_WEAPON, "fallguys/rhinoloadattack.ogg", 1, ATTN_NORM, 0, PITCH_NORM );
+
+		Math.MakeVectors( self.pev.angles );
+
+		Vector vecSmoke = self.pev.origin + g_Engine.v_forward * (-100);
+		vecSmoke.z += 40;
+
+		NetworkMessage m(MSG_PAS, NetworkMessages::SVC_TEMPENTITY, vecSmoke);
+		m.WriteByte(TE_EXPLOSION);
+		m.WriteCoord(vecSmoke.x);
+		m.WriteCoord(vecSmoke.y);
+		m.WriteCoord(vecSmoke.z);
+		m.WriteShort(m_iSpriteTexture);
+		m.WriteByte(40);
+		m.WriteByte(30);
+		m.WriteByte(2 | 4 | 8);
+		m.End();
+	}
+
+	void DoDash()
+	{
+		g_SoundSystem.EmitSoundDyn( self.edict(), CHAN_VOICE, "fallguys/rhinoidle.ogg", 1, ATTN_NORM, 0, PITCH_NORM );
+
+		Math.MakeVectors( self.pev.angles );
+
+		m_bIsDashing = true;
+		
+		if (self.m_hEnemy.IsValid())
+		{
+			CBaseEntity @pEnemy = self.m_hEnemy.GetEntity();
+			Vector vecDash = pEnemy.pev.origin - self.pev.origin;
+			vecDash.z = 0;
+			vecDash = vecDash.Normalize();
+			m_vecDashDir = vecDash;
+			m_vecDashTarget = pEnemy.pev.origin + m_vecDashDir * 150;
+			m_vecDashTarget.z = self.pev.origin.z;
+			self.pev.angles = Math.VecToAngles(m_vecDashDir);
+		}
+		else
+		{
+			m_vecDashDir = g_Engine.v_forward;
+			m_vecDashTarget = self.pev.origin + m_vecDashDir * 1000;
+		}
+
+		self.pev.velocity = m_vecDashDir * 800;
+	}
+
+	void DashTouch(CBaseEntity @pOther)
+	{
+		if(!pOther.IsPlayer())
+			return;
+			
+		if(!pOther.IsAlive())
+			return;
+
+		pOther.TakeDamage( self.pev, self.pev, 1, DMG_SLASH );
+		pOther.pev.velocity = pOther.pev.velocity + m_vecDashDir * self.pev.frags * 0.6;
+		pOther.pev.velocity = pOther.pev.velocity + Vector(0, 0, 1) * self.pev.frags * 0.4;
+	}
+
+	void StartTask ( Task@ pTask )
+	{
+		self.m_iTaskStatus = TASKSTATUS_RUNNING;
+
+		switch ( pTask.iTask )
+		{
+			case TASK_RANGE_ATTACK1:
+			{
+				self.m_IdealActivity = ACT_RANGE_ATTACK1;
+				SetTouch(TouchFunction(this.DashTouch));
+				break;
+			}
+			default:
+			{
+				BaseClass.StartTask( pTask );
+				break;
+			}
+		}
+	}
+
+	void RunTask(Task@ pTask)
+	{
+		switch ( pTask.iTask )
+		{
+			case TASK_RANGE_ATTACK1:
+			{
+				if ( self.m_fSequenceFinished )
+				{
+					g_SoundSystem.StopSound( self.edict(), CHAN_VOICE, "fallguys/rhinoidle.ogg" );
+
+					m_bIsDashing = false;
+					self.TaskComplete();
+					self.m_IdealActivity = ACT_IDLE;
+					SetThink(null);
+				}
+				else
+				{
+					if(m_bIsDashing)
+					{
+						if(self.pev.velocity.Length() < 30)
+						{
+							g_SoundSystem.StopSound( self.edict(), CHAN_VOICE, "fallguys/rhinoidle.ogg" );
+
+							m_bIsDashing = false;
+							self.TaskComplete();
+							self.m_IdealActivity = ACT_IDLE;
+							SetThink(null);
+						}
+						else
+						{
+							Vector vDiff = m_vecDashTarget - self.pev.origin;
+							vDiff.z = 0;
+							vDiff = vDiff.Normalize();
+							if(DotProduct(vDiff, m_vecDashDir) > 0)
+							{
+								self.pev.velocity = m_vecDashDir * 800;
+							}
+						}
+					}
+				}
+				break;
+			}
+			default:
+			{
+				BaseClass.RunTask(pTask);
+				break;
+			}
+		}
+	}
+
+	void HandleAnimEvent(MonsterEvent@ pEvent)
+	{
+		switch(pEvent.event)
+		{
+			case RHINO_LOAD_ATTACK:
+				LoadMeleeAttack();
+				break;
+			case RHINO_DO_ATTACK:
+				DoMeleeAttack();
+				break;
+			case RHINO_END_ATTACK:
+				EndMeleeAttack();
+				break;
+			case RHINO_LOAD_DASH:
+				LoadDash();
+				break;
+			case RHINO_DO_DASH:
+				DoDash();
+				break;
+			default:
+				BaseClass.HandleAnimEvent(pEvent);
+		}
+	}
+}
+
 HookReturnCode PlayerAddToFullPack( entity_state_t@ state, int e, edict_t @ent, edict_t@ host, int hostflags, int player, uint& out uiFlags )
 {
 	if(ent.vars.iuser4 == g_iLodStudioModelMagicNumber)
@@ -4077,7 +4825,7 @@ HookReturnCode PlayerAddToFullPack( entity_state_t@ state, int e, edict_t @ent, 
     return HOOK_HANDLED;
 }
 
-const string m_szEliminatedSndName = "fallguys/eliminated.wav";
+//const string m_szEliminatedSndName = "fallguys/eliminated.wav";
 
 HookReturnCode PlayerKilled( CBasePlayer@ pPlayer, CBaseEntity@ pAttacker, int iGib )
 {
@@ -4086,9 +4834,9 @@ HookReturnCode PlayerKilled( CBasePlayer@ pPlayer, CBaseEntity@ pAttacker, int i
     if(!pPlayer.IsNetClient())
         return HOOK_HANDLED;
 	
-	NetworkMessage message( MSG_ONE, NetworkMessages::SVC_STUFFTEXT, pPlayer.edict() );
-		message.WriteString("spk " + m_szEliminatedSndName+"\n");
-	message.End();
+	//NetworkMessage message( MSG_ONE, NetworkMessages::SVC_STUFFTEXT, pPlayer.edict() );
+	//	message.WriteString("spk " + m_szEliminatedSndName+"\n");
+	//message.End();
 
 	//MetaHookSv
 	//NetworkMessage message( MSG_ONE, NetworkMessages::NetworkMessageType(146), pPlayer.edict() );
@@ -4117,27 +4865,17 @@ HookReturnCode PlayerSpawn(CBasePlayer@ pPlayer)
 
 HookReturnCode PlayerTakeDamage(DamageInfo@ info)
 {
-	//g_Game.AlertMessage( at_console, "takedamage from %1 %2\n", info.pAttacker.pev.netname, info.pAttacker.pev.targetname);
-	if(info.pAttacker !is null && info.pAttacker.IsMonster())
+	if(info.flDamage < 10)
 	{
-		CBaseMonster@ pMonster = cast<CBaseMonster@>(info.pAttacker);
 		CBasePlayer@ pPlayer = cast<CBasePlayer@>(info.pVictim);
 
-		if(pPlayer !is null && pPlayer.IsNetClient())
-		{
-			if(pMonster.pev.classname == "monster_bullchicken")
-			{
-				info.flDamage = 0;
-				pPlayer.pev.punchangle.z = -20;
-				pPlayer.pev.punchangle.x = 20;
+		info.flDamage = 0;
 
-				pPlayer.pev.velocity = pPlayer.pev.velocity + g_Engine.v_forward * (pMonster.pev.frags - 300);
-				pPlayer.pev.velocity = pPlayer.pev.velocity + g_Engine.v_up * (pMonster.pev.armorvalue - 300);
+		g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_VOICE, g_szPlayerHitSound[Math.RandomLong(0, 6)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
 
-				return HOOK_HANDLED;
-			}
-		}
+		return HOOK_HANDLED;
 	}
+
     return HOOK_CONTINUE;
 }
 
@@ -4340,6 +5078,16 @@ Vector GetViewDir(CBaseEntity@ plr) {
 	return g_Engine.v_forward;
 }
 
+Vector GetAimDir(CBaseEntity@ ent) {
+	Vector angles = ent.pev.angles;
+
+	angles.x = -angles.x;
+
+	Math.MakeVectors( angles );
+	
+	return g_Engine.v_forward;
+}
+
 bool PlayerGrab( CBaseEntity@ pPlayer)
 {	
 	CBasePlayer@ pGrabber = cast<CBasePlayer@>(@pPlayer);
@@ -4461,6 +5209,7 @@ void MapInit()
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerRandomMultiple", "trigger_random_multiple" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerEntityItor2", "trigger_entity_itor2" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerEntityItor3", "trigger_entity_itor3" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerRelay2", "trigger_relay2" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CGamePlayerCounter2", "game_player_counter2" );
 	
 	//Solid entity
@@ -4470,14 +5219,16 @@ void MapInit()
 	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncLever", "func_lever" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncBarrier", "func_barrier" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncBouncer", "func_bouncer" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncBounceDrum", "func_bouncedrum" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncPendulum2", "func_pendulum2" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerFreeze", "trigger_freeze" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerFindBrush", "trigger_findbrush" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "CMonsterRhino", "monster_rhino" );
 
 	g_iPlayerArrowSpriteModelIndex = g_Game.PrecacheModel( g_szPlayerArrowSprite );
 	g_iPlayerArrowSprite2ModelIndex = g_Game.PrecacheModel( g_szPlayerArrowSprite2 );
 
-	g_Game.PrecacheGeneric( "sound/" + m_szEliminatedSndName );
+	//g_Game.PrecacheGeneric( "sound/" + m_szEliminatedSndName );
 
 	g_SoundSystem.PrecacheSound( g_szPlayerGrabSound );
 	g_SoundSystem.PrecacheSound( g_szPlayerGrabReleaseSound );
@@ -4500,6 +5251,22 @@ void MapInit()
 	g_SoundSystem.PrecacheSound( g_szPlayerJumpSound[6] );
 	g_SoundSystem.PrecacheSound( g_szPlayerJumpSound[7] );
 
+	g_szPlayerHitSound[0] = "fallguys/playerhit1.ogg";
+	g_szPlayerHitSound[1] = "fallguys/playerhit2.ogg";
+	g_szPlayerHitSound[2] = "fallguys/playerhit3.ogg";
+	g_szPlayerHitSound[3] = "fallguys/playerhit4.ogg";
+	g_szPlayerHitSound[4] = "fallguys/playerhit5.ogg";
+	g_szPlayerHitSound[5] = "fallguys/playerhit6.ogg";
+	g_szPlayerHitSound[6] = "fallguys/playerhit7.ogg";
+
+	g_SoundSystem.PrecacheSound( g_szPlayerHitSound[0] );
+	g_SoundSystem.PrecacheSound( g_szPlayerHitSound[1] );
+	g_SoundSystem.PrecacheSound( g_szPlayerHitSound[2] );
+	g_SoundSystem.PrecacheSound( g_szPlayerHitSound[3] );
+	g_SoundSystem.PrecacheSound( g_szPlayerHitSound[4] );
+	g_SoundSystem.PrecacheSound( g_szPlayerHitSound[5] );
+	g_SoundSystem.PrecacheSound( g_szPlayerHitSound[6] );
+
 	g_szPlayerFallingSound[0] = "fallguys/playerfall1.ogg";
 	g_szPlayerFallingSound[1] = "fallguys/playerfall2.ogg";
 
@@ -4507,7 +5274,6 @@ void MapInit()
 	g_SoundSystem.PrecacheSound( g_szPlayerFallingSound[1] );
 
     g_Hooks.RegisterHook(Hooks::Player::PlayerAddToFullPack, @PlayerAddToFullPack);
-	g_Hooks.RegisterHook(Hooks::Player::PlayerKilled, @PlayerKilled);
 	g_Hooks.RegisterHook(Hooks::Player::PlayerSpawn, @PlayerSpawn);
     g_Hooks.RegisterHook(Hooks::Player::PlayerTakeDamage, @PlayerTakeDamage);
     g_Hooks.RegisterHook(Hooks::Player::PlayerPreThink, @PlayerPreThink);
