@@ -21,7 +21,7 @@ sound/fallguys/countdown_one.wav
 sound/fallguys/countdown_three.wav
 sound/fallguys/countdown_two.wav
 sound/fallguys/drum.ogg
-sound/fallguys/eliminated.ogg
+sound/fallguys/eliminated.wav
 sound/fallguys/fruitappear.ogg
 sound/fallguys/fruitdisappear.ogg
 sound/fallguys/grab.ogg
@@ -75,12 +75,16 @@ sound/fallguys/win.ogg
 sprites/fallguys/playerarrow.spr
 sprites/fallguys/playerarrow2.spr
 sprites/fallguys/eliminated.spr
+sprites/fallguys/introdarkgreen.spr
+sprites/fallguys/introlightgreen.spr
+sprites/fallguys/introroxo.spr
 sprites/fallguys/countdown.spr
 sprites/fallguys/qualified.spr
 sprites/fallguys/roundend.spr
 sprites/fallguys/roundover.spr
 sprites/fallguys/timer.spr
 sprites/laserbeam.spr
+sprites/boom.spr
 models/fallguys/arch.mdl
 models/fallguys/ball.mdl
 models/fallguys/ball2.mdl
@@ -112,6 +116,7 @@ models/fallguys/logo.mdl
 models/fallguys/logo2.mdl
 models/fallguys/net7.mdl
 models/fallguys/number.mdl
+models/fallguys/pillar.mdl
 models/fallguys/pole.mdl
 models/fallguys/pole15.mdl
 models/fallguys/pole16.mdl
