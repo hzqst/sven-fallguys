@@ -69,6 +69,13 @@ sound/fallguys/rhinoendattack.ogg
 sound/fallguys/rhinoidle.ogg
 sound/fallguys/rhinoloadattack.ogg
 sound/fallguys/roundend.ogg
+sound/fallguys/seesawstart.ogg
+sound/fallguys/seesawstart2.ogg
+sound/fallguys/seesawstart3.ogg
+sound/fallguys/seesawstart4.ogg
+sound/fallguys/seesawstop.ogg
+sound/fallguys/seesawstop2.ogg
+sound/fallguys/seesawstop3.ogg
 sound/fallguys/slide.ogg
 sound/fallguys/survival.ogg
 sound/fallguys/win.ogg
@@ -132,6 +139,7 @@ models/fallguys/roll4.mdl
 models/fallguys/scaff.mdl
 models/fallguys/section.mdl
 models/fallguys/section2.mdl
+models/fallguys/seesaw.mdl
 models/fallguys/stick.mdl
 models/fallguys/water.mdl
 models/fallguys/wball.mdl

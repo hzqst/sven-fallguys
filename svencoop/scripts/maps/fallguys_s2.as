@@ -2085,8 +2085,41 @@ class CFuncLever : ScriptBaseEntity
 	float m_flReturnAngle = 45.0;
 	float m_flReturnForce = 0;
 
+	array<string> m_szStartSpinSoundName = {
+		"fallguys/seesawstart.ogg",
+		"fallguys/seesawstart2.ogg",
+		"fallguys/seesawstart3.ogg",
+		"fallguys/seesawstart4.ogg"
+	};
+
+	array<string> m_szStopSpinSoundName = {
+		"fallguys/seesawstop.ogg",
+		"fallguys/seesawstop2.ogg",
+		"fallguys/seesawstop3.ogg"
+	};
+
+	bool m_flLastSpinState = false;
+	float m_flLastSpinTime = 0;
+
+	void Precache()
+	{
+		BaseClass.Precache();
+		
+		g_SoundSystem.PrecacheSound( m_szStartSpinSoundName[0] );
+		g_SoundSystem.PrecacheSound( m_szStartSpinSoundName[1] );
+		g_SoundSystem.PrecacheSound( m_szStartSpinSoundName[2] );
+		g_SoundSystem.PrecacheSound( m_szStartSpinSoundName[3] );
+
+		g_SoundSystem.PrecacheSound( m_szStopSpinSoundName[0] );
+		g_SoundSystem.PrecacheSound( m_szStopSpinSoundName[1] );
+		g_SoundSystem.PrecacheSound( m_szStopSpinSoundName[2] );
+
+	}
+
 	void Spawn()
 	{
+		Precache();
+
 		self.pev.solid = SOLID_BSP;
 		self.pev.movetype = MOVETYPE_PUSH;
 
@@ -2271,11 +2304,26 @@ class CFuncLever : ScriptBaseEntity
 
 			NextThink(self.pev.ltime + 0.1, true);
 			SetThink(ThinkFunction(this.Spin));
+
+			if(!m_flLastSpinState)
+			{
+				g_SoundSystem.EmitSoundDyn( self.edict(), CHAN_WEAPON, m_szStartSpinSoundName[Math.RandomLong(0, 3)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+
+				m_flLastSpinTime = g_Engine.time;
+				m_flLastSpinState = true;
+			}
 		}
 		else
 		{
 			NextThink(self.pev.ltime + 0.1, false);
 			SetThink(ThinkFunction(this.Spin));
+
+			if(m_flLastSpinState && g_Engine.time > m_flLastSpinTime + 3.0)
+			{
+				g_SoundSystem.EmitSoundDyn( self.edict(), CHAN_WEAPON, m_szStopSpinSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+
+				m_flLastSpinState = false;
+			}
 		}
 	}
 
@@ -2285,6 +2333,7 @@ class CFuncLever : ScriptBaseEntity
 		{
 			self.pev.angles = g_vecZero;
 			self.pev.avelocity = g_vecZero;
+			m_flLastSpinState = false;
 		}
 	}
 }
@@ -5650,15 +5699,9 @@ const bool doCommand(CBasePlayer@ plr, const CCommand@ args, bool inConsole) {
 		}
 		return true;
   }
-  else if (args.ArgC() == 1 && (args[0] == ".fgtest1" || args[0] == "fgtest1")) {
+  else if (args.ArgC() == 1) {
 
-		plr.pev.origin = Vector(-1923, -978, 1049);
-
-		return true;
-  }
-  else if (args.ArgC() == 1 && (args[0] == ".fgtest2" || args[0] == "fgtest2")) {
-
-		plr.pev.origin = Vector(-5967, -1967, -1999);
+		plr.pev.origin = Vector(-1978, -3072, 1366);
 
 		return true;
   }
