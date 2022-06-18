@@ -4903,8 +4903,14 @@ class CTriggerFreeze : ScriptBaseEntity
 const int RHINO_LOAD_ATTACK = 1;
 const int RHINO_DO_ATTACK = 2;
 const int RHINO_END_ATTACK = 3;
+
 const int RHINO_LOAD_DASH = 4;
 const int RHINO_DO_DASH = 5;
+
+const int RHINO_LOAD_KICK = 6;
+const int RHINO_DO_KICK = 7;
+const int RHINO_END_KICK = 8;
+
 const int RHINO_START_WALK = 10;
 
 array<ScriptSchedule@>@ monster_rhino_schedules;
@@ -4919,6 +4925,7 @@ class CMonsterRhino : ScriptBaseMonsterEntity
 {
 	int m_iSpriteTexture = 0;
 	bool m_bIsDashing = false;
+	float m_flNextDashSmoke = 0;
 	float m_flStartDash = 0;
 	Vector m_vecDashDir;
 	Vector m_vecDashTarget;
@@ -5025,6 +5032,16 @@ class CMonsterRhino : ScriptBaseMonsterEntity
 			return false;
 		}
 
+		CBaseEntity@ pEnemy = self.m_hEnemy.GetEntity();
+
+		if(pEnemy !is null)
+		{
+			if((pEnemy.pev.flags & FL_ONGROUND) == FL_ONGROUND && pEnemy.pev.groundentity is self.edict())
+			{
+				return false;
+			}
+		}
+
 		if (flDot >= 0.7)
 		{
 			if (flDist <= 180)
@@ -5038,6 +5055,21 @@ class CMonsterRhino : ScriptBaseMonsterEntity
 
 	bool CheckMeleeAttack2( float flDot, float flDist )
 	{
+		if (self.m_flNextAttack > g_Engine.time)
+		{
+			return false;
+		}
+
+		CBaseEntity@ pEnemy = self.m_hEnemy.GetEntity();
+
+		if(pEnemy !is null)
+		{
+			if((pEnemy.pev.flags & FL_ONGROUND) == FL_ONGROUND && pEnemy.pev.groundentity is self.edict())
+			{
+				return true;
+			}
+		}
+
 		return false;
 	}
 
@@ -5100,9 +5132,68 @@ class CMonsterRhino : ScriptBaseMonsterEntity
 		g_SoundSystem.EmitSoundDyn( self.edict(), CHAN_WEAPON, "fallguys/rhinoendattack.ogg", 1, ATTN_NORM, 0, PITCH_NORM );
 	}
 
+	void LoadKick()
+	{
+		g_SoundSystem.EmitSoundDyn( self.edict(), CHAN_WEAPON, "fallguys/rhinoloadattack.ogg", 1, ATTN_NORM, 0, PITCH_NORM );
+	}
+
+	void DoKick()
+	{
+		g_SoundSystem.EmitSoundDyn( self.edict(), CHAN_STATIC, "fallguys/rhinoattack.ogg", 1, ATTN_NORM, 0, PITCH_NORM );
+
+		Vector vecSrc = self.pev.origin;
+
+		Vector dir = GetAimDir(self);
+		
+		Vector vecTarget = vecSrc;
+
+		vecTarget.z += 128;
+
+		CBaseEntity@ pEntity = null;
+		
+		while((@pEntity = g_EntityFuncs.FindEntityInSphere(pEntity, vecTarget, 256.0, "player", "classname")) !is null)
+		{
+			CBasePlayer@ pPlayer = cast<CBasePlayer@>(pEntity);
+			if(pPlayer.IsAlive())
+			{
+				if((pPlayer.pev.flags & FL_ONGROUND) == FL_ONGROUND && pPlayer.pev.groundentity is self.edict())
+				{
+					pPlayer.TakeDamage( self.pev, self.pev, 1, DMG_SLASH );
+
+					pPlayer.pev.velocity = pPlayer.pev.velocity + g_Engine.v_forward * self.pev.frags * 0.75;
+					pPlayer.pev.velocity = pPlayer.pev.velocity + g_Engine.v_up * self.pev.frags * 0.75;
+				}
+			}
+		}
+
+		self.m_flNextAttack = g_Engine.time + 2.0;
+	}
+	
+	void EndKick()
+	{
+		g_SoundSystem.EmitSoundDyn( self.edict(), CHAN_WEAPON, "fallguys/rhinoendattack.ogg", 1, ATTN_NORM, 0, PITCH_NORM );
+	}
+
 	void StartWalk()
 	{
 		//g_SoundSystem.EmitSoundDyn( self.edict(), CHAN_VOICE, "fallguys/rhinoidle.ogg", 1.0, ATTN_NORM, 0, PITCH_NORM );
+	}
+
+	void DashSmoke()
+	{
+		Vector vecSmoke = self.pev.origin;// + g_Engine.v_forward * (-100);
+		vecSmoke.z += 5;
+
+		NetworkMessage m(MSG_PAS, NetworkMessages::SVC_TEMPENTITY, vecSmoke);
+		m.WriteByte(TE_EXPLOSION);
+		m.WriteCoord(vecSmoke.x);
+		m.WriteCoord(vecSmoke.y);
+		m.WriteCoord(vecSmoke.z);
+		m.WriteShort(m_iSpriteTexture);
+		m.WriteByte(20);//scale
+		m.WriteByte(30);//framerate
+		m.WriteByte(2 | 4 | 8);
+		m.End();
 	}
 
 	void LoadDash()
@@ -5122,8 +5213,8 @@ class CMonsterRhino : ScriptBaseMonsterEntity
 		m.WriteCoord(vecSmoke.y);
 		m.WriteCoord(vecSmoke.z);
 		m.WriteShort(m_iSpriteTexture);
-		m.WriteByte(40);
-		m.WriteByte(30);
+		m.WriteByte(40);//scale
+		m.WriteByte(30);//framerate
 		m.WriteByte(2 | 4 | 8);
 		m.End();
 	}
@@ -5136,6 +5227,7 @@ class CMonsterRhino : ScriptBaseMonsterEntity
 
 		m_bIsDashing = true;
 		m_flStartDash = g_Engine.time;
+		m_flNextDashSmoke = g_Engine.time + 0.1;
 		
 		if (self.m_hEnemy.IsValid())
 		{
@@ -5175,9 +5267,21 @@ class CMonsterRhino : ScriptBaseMonsterEntity
 			g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
 		}
 
-		pOther.pev.velocity = m_vecDashDir * self.pev.frags * 0.6;
-		pOther.pev.velocity = pOther.pev.velocity + Vector(0, 0, 1) * self.pev.frags * 0.4;
+		Vector PushVelocity = m_vecDashDir * self.pev.frags * 1.0;
+		PushVelocity.z += self.pev.frags * 0.75;
+
+		Vector vDiff = pOther.pev.origin - self.pev.origin;
+		vDiff.z = 0;
+		vDiff = vDiff.Normalize();
+
+		float flCosAngle = DotProduct(vDiff, m_vecDashDir);
+
+		if(flCosAngle > 0)
+		{		
+			pOther.pev.velocity = PushVelocity * flCosAngle;
+		}
 	}
+
 
 	void StartTask ( Task@ pTask )
 	{
@@ -5224,7 +5328,7 @@ class CMonsterRhino : ScriptBaseMonsterEntity
 					{
 						if(self.pev.velocity.Length() < 50)
 						{
-							//g_Game.AlertMessage( at_console, "RunTask velocity\n");
+							//g_Game.AlertMessage( at_console, "RunTask low velocity\n");
 
 							g_SoundSystem.StopSound( self.edict(), CHAN_VOICE, "fallguys/rhinoidle.ogg" );
 
@@ -5241,6 +5345,13 @@ class CMonsterRhino : ScriptBaseMonsterEntity
 							if(DotProduct(vDiff, m_vecDashDir) > 0)
 							{
 								self.pev.velocity = m_vecDashDir * 800;
+
+								if(g_Engine.time > m_flNextDashSmoke)
+								{
+									DashSmoke();
+									m_flNextDashSmoke = g_Engine.time + 0.1;
+								}
+
 								//g_Game.AlertMessage( at_console, "RunTask dashing\n");
 							}
 							else
@@ -5296,6 +5407,17 @@ class CMonsterRhino : ScriptBaseMonsterEntity
 			case RHINO_DO_DASH:
 				DoDash();
 				break;
+				
+			case RHINO_LOAD_KICK:
+				LoadKick();
+				break;
+			case RHINO_DO_KICK:
+				DoKick();
+				break;
+			case RHINO_END_KICK:
+				EndKick();
+				break;
+
 			case RHINO_START_WALK:
 				StartWalk();
 				break;
