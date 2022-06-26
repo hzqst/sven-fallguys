@@ -36,7 +36,17 @@
 	zhlt_embedlightmapresolution(integer) : "ZHLT Embed Light Map Resolution" : 4
 ]
 
-@PointClass base(Targetname, Target) color(255 255 255) = trigger_sortscore : "Sort Player Score"
+@PointClass base(Targetname, Target) color(255 255 255) = game_player_counter2 : "Player Counter 2"
+[
+	delay(integer) : "update rate" : 0
+]
+
+@PointClass base(Targetname) color(255 255 255) = trigger_player_hat : "Give player hat"
+[
+	hatmodel(string) : "Hat model" : 0
+]
+
+@PointClass base(Targetname, Target) color(255 255 255) = trigger_sort_score : "Sort Player Score"
 [
 	sorttype(choices) : "Score Type" : 0 =
 	[
@@ -62,6 +72,8 @@
 	offsety(integer) : "Offset Y" : 0
 	countnum(integer) : "Countdown Number" : 0
 	holdtime(integer) : "Holdtime" : 0
+	target(target_destination) : "Trigger target entity at each countdown, called with USE_SET" : 0
+	finaltarget(target_destination) : "Trigger target entity when countdown to zero, called with USE_TOGGLE" : 0
 ]
 
 @PointClass base(Targetname) color(255 255 255) = trigger_hudsprite : "HUD Sprite"
@@ -83,29 +95,69 @@
 	sound(sound) : "Sound"
 ]
 
-@PointClass base(Targetname) color(255 255 255) = trigger_random_counter : "Generate random numbers"
+@PointClass base(Targetname) color(255 255 255) = trigger_random_counter : "Generate random numbers and call USE_SET with generated number as flValue"
 [
 	minvalue(integer) : "Minimum number to generate"
 	maxvalue(integer) : "Maximum number to generate"
 	spawnflags(Flags) =
 	[
 		1 : "Average Random" 	: 0
+		16 : "keep !activator" : 0
 	]
 ]
 
-@PointClass base(Targetname) color(255 255 255) = trigger_random_multiple : "Trigger multiple randoms"
+@PointClass base(Targetname) color(255 255 255) = trigger_random_multiple : "Triggers multiple entities randomly"
 [
 	mincount(integer) : "Minimum count to trigger"
 	maxcount(integer) : "Maximum count to trigger"
+	triggerstate(choices) : "Entity's Trigger State" : -1 =
+	[
+		-1 : "Keep original"
+		0 : "Off"
+		1 : "On"
+		2 : "Set"
+		3 : "Toggle"
+	]
+	triggervalue(integer) : "Entity's Trigger Value"
+	spawnflags(flags) =
+	[
+		16 : "keep !activator" : 0
+	]
+]
+
+@PointClass base(Targetname) color(255 255 255) = trigger_random_path : "Generate a random path"
+[
+	rowcount(integer) : "Row count"
+	colcount(integer) : "Column count"
+	targetname_prefix(string) : "Targetname prefix"
+	cellconnector(string) : "Cell Connector (must be a trigger_createentity)"
+	triggerstate(choices) : "Entity's Trigger State" : 0 =
+	[
+		-1 : "Keep original use type"
+		0 : "Off"
+		1 : "On"
+		2 : "Set"
+		3 : "Toggle"
+	]
+	triggervalue(integer) : "Entity's Trigger Value"
+	spawnflags(flags) =
+	[
+	
+	]
 ]
 
 @PointClass base(Targetname) color(255 255 255) = trigger_respawn_unstuck : "Teleport player to unstucked spawnpoint"
 [
 ]
 
-@PointClass base(Targetname, Target) color(255 255 255) = trigger_rot_control : "Control func_rotating"
+@PointClass base(Targetname, Target) color(255 255 255) = trigger_rot_control : "Control rotate speed of func_rotating_fg"
 [
-	newspeed(integer) : "New speed to rotate"
+	speed(integer) : "New speed to rotate"
+]
+
+@PointClass base(Targetname, Target) color(255 255 255) = trigger_spectator : "Force player to join as spectator"
+[
+	
 ]
 
 @PointClass base(Targetname, Angles) color(255 255 255) = env_shadow_control : "Shadow Control"
@@ -149,17 +201,478 @@
 	returnforce(integer) : "Moment of force to return back"
 ]
 
+@SolidClass base(Targetname, ZHLTbmodel) color(255 255 255) = func_barrier : "Barrier"
+[
+	slideforce(integer) : "Slide Force"
+	slidemaxvelocity(integer) : "Slide Max Velocity"
+	bounceforce(integer) : "Bounce Force"
+	rendermode(choices) : "Render Mode" : 0 =
+	[
+		0: "Normal"
+		1: "Color"
+		2: "Texture"
+		3: "Glow"
+		4: "Solid"
+		5: "Additive"
+	]
+	renderamt(integer) : "FX Amount (1 - 255)"
+]
+
 @SolidClass base(Targetname, ZHLTbmodel) color(255 255 255) = func_bouncer : "Bouncer"
+[
+	bounceforce(integer) : "Bounce Force"
+	rendermode(choices) : "Render Mode" : 0 =
+	[
+		0: "Normal"
+		1: "Color"
+		2: "Texture"
+		3: "Glow"
+		4: "Solid"
+		5: "Additive"
+	]
+	renderamt(integer) : "FX Amount (1 - 255)"
+]
+
+@SolidClass base(Targetname, ZHLTbmodel) color(255 255 255) = func_bouncedrum : "Bounce Drum"
+[
+	bounceforce(integer) : "Bounce Force"
+	bounceangles(string) : "Bounce Angles"
+	target(target_destination) : "env_studiomodel to play anim"
+	rendermode(choices) : "Render Mode" : 0 =
+	[
+		0: "Normal"
+		1: "Color"
+		2: "Texture"
+		3: "Glow"
+		4: "Solid"
+		5: "Additive"
+	]
+	renderamt(integer) : "FX Amount (1 - 255)"
+]
+
+@SolidClass base(Targetname, ZHLTbmodel) color(255 255 255) = func_breakdoor : "Break Door"
+[
+	minimpactvelocity(integer) : "Minimum impact velocity"
+	impactangles(string) : "Impact angles"
+	spawnflags(flags) =
+	[
+		1 : "REAL DOOR" : 0
+	]
+	rendermode(choices) : "Render Mode" : 0 =
+	[
+		0: "Normal"
+		1: "Color"
+		2: "Texture"
+		3: "Glow"
+		4: "Solid"
+		5: "Additive"
+	]
+	renderamt(integer) : "FX Amount (1 - 255)"
+]
+
+@SolidClass base(Targetname, ZHLTbmodel) color(255 255 255) = func_matchfloor : "Match fruit floor"
 [
 	spawnflags(flags) =
 	[
-		1 : "X Axis" : 0
-		2 : "Y Axis" : 0
-		4 : "No Clients" : 0
-		8 : "No Monsters" : 0
+		
 	]
-
-	frags(integer) : "Force of Bounce"
-	armorvalue(integer) : "Force of Bounce Upward"
-	bouncesound(sound) : "Bounce Sound"
+	rendermode(choices) : "Render Mode" : 0 =
+	[
+		0: "Normal"
+		1: "Color"
+		2: "Texture"
+		3: "Glow"
+		4: "Solid"
+		5: "Additive"
+	]
+	renderamt(integer) : "FX Amount (1 - 255)"
 ]
+
+@SolidClass base(Targetname, ZHLTbmodel) color(255 255 255) = func_tiptile  : "TipToe tile"
+[
+	spawnflags(flags) =
+	[
+		1 : "FAKE TILE" : 0
+	]
+	rendermode(choices) : "Render Mode" : 0 =
+	[
+		0: "Normal"
+		1: "Color"
+		2: "Texture"
+		3: "Glow"
+		4: "Solid"
+		5: "Additive"
+	]
+	renderamt(integer) : "FX Amount (1 - 255)"
+]
+
+@PointClass base(Targetname, Angles) studio() color(128 128 128) = env_studiomodel : "Studio Model Render Entity"
+[
+	model(studio) : "Model"
+	framerate(integer) : "Frames per second" : 1
+	frame(integer) : "Current frame" : 0
+	rendermode(choices) : "Render Mode" : 0 =
+	[
+		0: "Normal"
+		1: "Color"
+		2: "Texture"
+		3: "Glow"
+		4: "Solid"
+		5: "Additive"
+	]
+	renderamt(integer) : "FX Amount (1 - 255)"
+	rendercolor(color255) : "FX Color (R G B)" : "0 0 0"
+	lod1(integer) : "Use LoD1 if this distance exceeded"
+	lod1body(integer) : "body for LoD1"
+	lod2(integer) : "Use LoD2 if this distance exceeded"
+	lod2body(integer) : "body for LoD2"
+	lod3(integer) : "Use LoD3 if this distance exceeded"
+	lod3body(integer) : "body for LoD3"
+	target(string) : "Copy from entity"
+	origin_offset(string) : "Origin offset"
+	angles_offset(string) : "Angles offset"
+	spawnflags(flags) =
+	[
+		1 : "Copy origin from entity" : 0
+		2 : "Copy angles from entity" : 0
+		4 : "USE_SET change skin" : 0
+		8 : "USE_SET change body" : 0
+		16 : "USE_SET fx explode" : 0
+		32 : "Copy origin.z from entity" : 0
+		64 : "Copy EF_NODRAW bit from entity" : 0
+	]
+]
+
+@PointClass base(Targetname, Angles) studio() color(128 128 128) = env_physicmodel : "Studio Model moves in physic engine"
+[
+	model(studio) : "Model"
+	framerate(integer) : "Frames per second" : 1
+	frame(integer) : "Current frame" : 0
+	rendermode(choices) : "Render Mode" : 0 =
+	[
+		0: "Normal"
+		1: "Color"
+		2: "Texture"
+		3: "Glow"
+		4: "Solid"
+		5: "Additive"
+	]
+	renderamt(integer) : "FX Amount (1 - 255)"
+	rendercolor(color255) : "FX Color (R G B)" : "0 0 0"
+	lod1(integer) : "Use LoD1 if this distance exceeded"
+	lod1body(integer) : "body for LoD1"
+	lod2(integer) : "Use LoD2 if this distance exceeded"
+	lod2body(integer) : "body for LoD2"
+	lod3(integer) : "Use LoD3 if this distance exceeded"
+	lod3body(integer) : "body for LoD3"
+	spawnflags(flags) =
+	[
+		1 : "Is Super-Pusher" : 0
+		2 : "Pushable by players" : 0
+	]
+]
+
+@PointClass base(Targetname, Angles) studio() color(128 128 128) = env_skinbutton : "Skinned Button"
+[
+	model(studio) : "Model"
+	rendermode(choices) : "Render Mode" : 0 =
+	[
+		0: "Normal"
+		1: "Color"
+		2: "Texture"
+		3: "Glow"
+		4: "Solid"
+		5: "Additive"
+	]
+	renderamt(integer) : "FX Amount (1 - 255)"
+	rendercolor(color255) : "FX Color (R G B)" : "0 0 0"
+	target(string) : "Trigger target entity"
+	triggerstate(choices) : "Entity's Trigger State" : 0 =
+	[
+		0 : "Off"
+		1 : "On"
+		2 : "Set"
+		3 : "Toggle"
+	]
+	presssound(string) : "Press Sound"
+	skin(integer) : "Current Skin"
+	minskin(integer) : "Minimum Skin Index"
+	maxskin(integer) : "Maximum Skin Index"
+	minhullsize(string) : "Custom Min Hull Size (X Y Z)" : "0 0 0"
+	maxhullsize(string) : "Custom Max Hull Size (X Y Z)" : "0 0 0"
+	clickdelay(integer) : "Minimum delay between two click"
+	spawnflags(flags) =
+	[
+		1 : "Usable" : 0
+		2 : "Hide me when OFF" : 0
+		4 : "keep !activator" : 0
+	]
+]
+@PointClass base(Targetname) size(-12 -12 -12, 12 12 12) color(255 255 0) = trigger_entity_itor2 : "Entity Iterator EX 2"
+[
+	name_filter(string) : "Targetname filter"
+	name_startwith(string) : "Targetname start with"
+	classname_filter(string) : "Filter Entities by Classname"
+	status_filter(choices) : "Filter Entities by Status" : 0 =
+	[
+		0 : "No Filter (default)"
+		1 : "Only Living Entities"
+		2 : "Only Dead Entities"
+	]
+	target(target_destination) : "Entity's Trigger Target"
+	triggerstate(choices) : "Entity's Trigger State" : 0 =
+	[
+		0 : "Off"
+		1 : "On"
+		2 : "Set"
+		3 : "Toggle"
+	]
+	triggervalue(integer) : "Entity's Trigger Value"
+]
+
+@PointClass base(Targetname) size(-12 -12 -12, 12 12 12) color(255 255 0) = trigger_entity_itor3 : "Entity Iterator EX 3"
+[
+	name_filter(string) : "Targetname filter"
+	name_startwith(string) : "Targetname start with"
+	classname_filter(string) : "Filter Entities by Classname"
+	status_filter(choices) : "Filter Entities by Status" : 0 =
+	[
+		0 : "No Filter (default)"
+		1 : "Only Living Entities"
+		2 : "Only Dead Entities"
+	]
+	triggerstate(choices) : "Entity's Trigger State" : 0 =
+	[
+		0 : "Off"
+		1 : "On"
+		2 : "Set"
+		3 : "Toggle"
+		-1 : "Delete"
+	]
+	triggervalue(integer) : "Entity's Trigger Value"
+]
+
+@PointClass base(Targetname) size(-12 -12 -12, 12 12 12) color(255 255 0) = trigger_toggle_bsp : "control bsp entity like func_wall_toggle"
+[
+	target(target_destination) : "Target BSP Entity"
+	triggerstate(choices) : "Entity's Render State" : 0 =
+	[
+		0 : "Hide"
+		1 : "Show"
+		2 : "Depend on old state"
+	]
+	spawnflags(flags) =
+	[
+		1 : "Affects multiple targets" : 0
+	]
+]
+
+@PointClass base(Targetname) size(-12 -12 -12, 12 12 12) color(255 255 0) = trigger_create_ents : "Create entities in batch"
+[
+	target(target_destination) : "Entity that copy from"
+	m_iszCrtEntChildName(string) : "New entities targetname"
+	m_iszCrtEntChildClass(string) : "New entities classname"
+	rowoffset(string) : "Row offset of entities"
+	rowcount(integer) : "Row count"
+	coloffset(string) : "Column offset of entities"
+	colcount(integer) : "Column count"
+	spawnflags(flags) =
+	[
+	
+	]
+]
+
+
+@PointClass base(Targetname) color(255 255 255) = trigger_sort_panel : "Sort Panels"
+[
+	name_startwith(string) : "Targetname start with"
+	classname_filter(string) : "Filter Entities by Classname"
+	status_filter(choices) : "Filter Entities by Status" : 0 =
+	[
+		0 : "No Filter (default)"
+		1 : "Only Living Entities"
+		2 : "Only Dead Entities"
+	]
+	spawnflags(flags) =
+	[
+		1 : "Shuffle" : 0
+	]
+]
+
+@PointClass base(Targetname, Target) color(255 255 255) = trigger_relay2 : "Relay 2"
+[
+	spawnflags(flags) =
+	[
+		1 : "Start ON" : 0
+	]
+	target(target_destination) : "Entity to trigger when being triggered by USE_TOGGLE" : 0
+	triggerstate(choices) : "Entity's Trigger State" : 0 =
+	[
+		0 : "Off"
+		1 : "On"
+		2 : "Set"
+		3 : "Toggle"
+	]
+	triggervalue(integer) : "Entity's Trigger Value"
+]
+
+@SolidClass base(Targetname, Angles, Global, RenderFields, AttackObject, ZHLT) = func_tracktrain_fg : "Track Train for Fallguys"
+[
+	spawnflags(flags) =
+	[
+		1 : "No Pitch (X-rot)" : 0
+		2 : "No User Control" : 0
+		4 : "Forward Only" : 0
+		8 : "Passable" : 0
+		16 : "No YAW (Y-rot)" : 0
+	]
+	target(target_destination) : "First stop target"
+	wheels(integer) : "Distance between the wheels" : 50
+	height(integer) : "Height above track" : 4
+	startspeed(integer) : "Initial speed" : 0
+	speed(integer) : "Speed (units per second)" : 64
+	dmg(integer) : "Damage on crush" : 0
+	bank(string) : "Bank angle on turns" : "0"
+	_minlight(string) : "Minimum light level"
+	pushforce(integer) : "SidePush Force"
+	upforce(integer) : "Upward Force"
+	hitsound0(string) : "Hit Sound when hit player 0"
+	hitsound1(string) : "Hit Sound when hit player 1"
+	hitsound2(string) : "Hit Sound when hit player 2"
+	blocksound(string) : "Block Sound when block player"
+	
+	superpusher(choices) : "Is Super-Pusher" : 0 =
+	[
+		0 : "No"
+		1 : "Yes"
+	]
+]
+
+@SolidClass base(Targetname, Global, RenderFields, Angles, ZHLT) = func_rotating_fg : "Rotating Object for FallGuys"
+[
+	speed(integer)	: "Rotation Speed" : 0
+	fanfriction(integer) : "Friction (0 - 100%)" : 20
+	spawnflags(flags) =
+	[
+		1 : "Start ON" 		: 0
+		2 : "Reverse Direction" : 0
+		4 : "X Axis" 		: 0
+		8 : "Y Axis" 		: 0
+		16: "Acc/Dcc"		: 0
+		32: "Fan Pain"		: 0
+		64: "Not Solid"		: 0
+		128: "Small Radius" : 0
+		256: "Medium Radius" : 0
+		512: "Large Radius" : 1
+	]
+	m_iObeyTriggerMode(choices) : "Obey Trigger Mode" : 1 =
+	[
+		0 : "No"
+		1 : "Yes"
+	]
+	_minlight(integer) : "_minlight"
+	spawnorigin(string) : "X Y Z - Move here after lighting" : "0 0 0"
+	dmg(integer) : "Damage inflicted when blocked" : 0
+	pushforce(integer) : "SidePush Force when push"
+	upforce(integer) : "Upward Force when push"
+	outforce(integer) : "Outward Force when push"
+	blockoutforce(integer) : "SidePush Force when blocked"
+	blockupforce(integer) : "Upward Force when blocked"
+	slideforce(integer) : "Push Force when slide"
+	maxvelocity(integer) : "Maximum velocity when push"
+	dynamicforce(integer) : "Dynamic rate for push force"
+	bouncedrumforce(integer) : "Bounce Drum Force?"
+	bouncedrumpitch(integer) : "Bounce Drum Pitch?"
+	bouncedrumstudio(string) : "Bounce Drum env_studiomodel target?"
+	hitsound0(string) : "Hit Sound when hit player 0"
+	hitsound1(string) : "Hit Sound when hit player 1"
+	hitsound2(string) : "Hit Sound when hit player 2"
+	blocksound(string) : "Block Sound"
+	slidesound(string) : "Slide Sound"
+	
+	superpusher(choices) : "Is Super-Pusher" : 0 =
+	[
+		0 : "No"
+		1 : "Yes"
+	]
+]
+
+@BaseClass base(Targetname, Global, RenderFields, PlatSounds) = BaseTrain
+[
+	target(target_source) : "First stop target"
+	speed(integer) : "Speed (units per second)" : 64
+	m_iObeyTriggerMode(choices) : "Obey Trigger Mode" : 1 =
+	[
+		0 : "No"
+		1 : "Yes"
+	]
+]
+
+@SolidClass base(BaseTrain, AttackObject, ZHLT, StartStopable) = func_train_fg : "Train for Fall Guys"
+[
+	avelocity(string) : "Angular Velocity (X Y Z)"
+	dmg(integer) : "Damage on crush" : 0
+	skin(integer) : "Contents" : 0
+	_minlight(string) : "Minimum light level"
+	pushforce(integer) : "Push Force"
+	upforce(integer) : "Upward Force"
+	blockpushforce(integer) : "Block Push Force"
+	blockupforce(integer) : "Block Upward Force"
+	bounceforce(integer) : "Bounce Force"
+	spawnflags(flags) =
+	[
+		8 : "Not solid" : 0
+	]
+	bouncesound0(string) : "Bounce Sound 0"
+	bouncesound1(string) : "Bounce Sound 1"
+	bouncesound2(string) : "Bounce Sound 2"
+	hitsound0(string) : "Hit Sound 0"
+	hitsound1(string) : "Hit Sound 1"
+	hitsound2(string) : "Hit Sound 2"
+	blocksound(string) : "Block Sound when block player"
+	blockcrushtime(integer) : "Block crush time"
+
+	superpusher(choices) : "Is Super-Pusher" : 0 =
+	[
+		0 : "No"
+		1 : "Yes"
+	]
+]
+
+@SolidClass base(Global, Appearflags, Targetname, RenderFields, Angles, ZHLT) = func_pendulum2 : "Swings back and forth"
+[
+	speed(integer) : "Speed" : 100
+	distance(integer) : "Distance (deg)" : 90
+	dmg(integer) : "Damage inflicted when blocked" : 0
+	spawnflags(flags) =
+	[
+		1: "Start ON" : 0
+		8: "Passable" : 0
+		16: "Auto-return" : 0
+		64: "X Axis" : 0
+		128: "Y Axis" : 0
+	]
+	_minlight(integer) : "_minlight"
+	pushforce(integer) : "Push Force"
+	upforce(integer) : "Upward Force"
+	blockpushforce(integer) : "Block Push Force"
+	blockupforce(integer) : "Block Upward Force"
+	bounceforce(integer) : "Bounce Force"
+	bouncesound0(string) : "Bounce Sound 0"
+	bouncesound1(string) : "Bounce Sound 1"
+	bouncesound2(string) : "Bounce Sound 2"
+	hitsound0(string) : "Hit Sound 0"
+	hitsound1(string) : "Hit Sound 1"
+	hitsound2(string) : "Hit Sound 2"
+	blocksound(string) : "Block Sound when block player"
+	blockcrushtime(integer) : "Block crush time"
+	
+	superpusher(choices) : "Is Super-Pusher" : 0 =
+	[
+		0 : "No"
+		1 : "Yes"
+	]
+]
+
+
+@PointClass base(Monster) size(-100 -64  -60, 100 64 68) studio("models/fallguys/rhino.mdl") = monster_rhino : "Rhino" []

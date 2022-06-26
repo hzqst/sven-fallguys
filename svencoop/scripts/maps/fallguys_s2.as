@@ -2,6 +2,9 @@ const float c_PlayerImpactPlayer_MinimumCosAngle = 0.3;
 const float c_PlayerImpactPlayer_MinimumImpactVelocity = 100;
 const float c_PlayerImpactPlayer_VelocityTransferEfficiency = 0.75;
 
+const float c_PlayerGrab_Range = 48.0;
+const float c_PlayerGrab_Velocity = 2500.0;
+
 const int LOD_BODY = 1;
 const int LOD_MODELINDEX = 2;
 const int LOD_SCALE = 4;
@@ -97,6 +100,7 @@ array<bool> g_ArrayFallingPlayer(33);
 array<string> g_ArrayFallingPlayerPlayingSound(33);
 
 array<EHandle> g_ArrayArrowEntityPlayer(33);
+array<EHandle> g_ArrayHatEntityPlayer(33);
 
 array<string> g_szPlayerJumpSound(8);
 array<string> g_szPlayerHitSound(7);
@@ -6088,6 +6092,7 @@ class CTriggerToggleBSP : ScriptBaseEntity
 		}
 	}
 }
+
 class CTriggerCreateEnts : ScriptBaseEntity
 {
 	string m_iszCrtEntChildName;
@@ -6192,6 +6197,54 @@ class CTriggerCreateEnts : ScriptBaseEntity
 
 					g_EntityFuncs.DispatchSpawn(pEntity.edict());
 				}
+			}
+		}
+	}
+}
+
+class CTriggerPlayerHat : ScriptBaseEntity
+{
+	string m_szHatModel;
+
+	void Precache()
+	{
+		g_Game.PrecacheModel(m_szHatModel);
+
+		BaseClass.Precache();
+	}
+
+	void Spawn()
+	{
+		Precache();
+		self.pev.solid = SOLID_NOT;
+		self.pev.movetype = MOVETYPE_NONE;
+
+		g_EntityFuncs.SetModel( self, self.pev.model );
+		g_EntityFuncs.SetSize( self.pev, self.pev.mins, self.pev.maxs );
+		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+	}
+
+	bool KeyValue( const string & in szKey, const string & in szValue )
+	{
+		if(szKey == "hatmodel"){
+			m_szHatModel = szValue;
+			return true;
+		}
+
+		return BaseClass.KeyValue( szKey, szValue );
+	}
+
+	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
+	{
+		if(m_szHatModel.IsEmpty())
+			return;
+
+		if(useType == USE_TOGGLE || useType == USE_SET || useType == USE_ON)
+		{
+			if(pActivator !is null && pActivator.IsPlayer())
+			{				
+				CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pActivator);
+				PlayerShowHat(pPlayer, m_szHatModel);
 			}
 		}
 	}
@@ -7138,6 +7191,7 @@ HookReturnCode PlayerAddToFullPack( entity_state_t@ state, int e, edict_t @ent, 
 HookReturnCode ClientDisconnect(CBasePlayer@ pPlayer)
 {
 	PlayerHideArrow(pPlayer);
+	PlayerHideHat(pPlayer);
 
     return HOOK_CONTINUE;
 }
@@ -7292,6 +7346,38 @@ void PlayerHideArrow(CBasePlayer@ pPlayer)
 	eHandle.GetEntity().SUB_Remove();
 }
 
+void PlayerShowHat(CBasePlayer@ pPlayer, string szHatModel)
+{
+	EHandle eHandle = g_ArrayHatEntityPlayer[pPlayer.entindex()];
+
+	if(eHandle.IsValid())
+		return;
+
+	CBaseEntity@ pEntity = g_EntityFuncs.Create("info_target", pPlayer.pev.origin, pPlayer.pev.angles, false);
+	g_EntityFuncs.SetModel(pEntity, szHatModel);
+	pEntity.pev.sequence = 0;
+	pEntity.pev.frame = 0;
+	//pEntity.pev.scale = 0.15;
+	@pEntity.pev.aiment = pPlayer.edict();
+	pEntity.pev.movetype = MOVETYPE_FOLLOW;
+	pEntity.pev.rendermode = kRenderNormal;
+
+	//pEntity.pev.iuser4 = g_iPlayerArrowSpriteMagicNumber;
+	//pEntity.pev.iuser1 = pPlayer.entindex();
+
+	g_ArrayHatEntityPlayer[pPlayer.entindex()] = EHandle(@pEntity);
+}
+
+void PlayerHideHat(CBasePlayer@ pPlayer)
+{
+	EHandle eHandle = g_ArrayHatEntityPlayer[pPlayer.entindex()];
+
+	if(!eHandle.IsValid())
+		return;
+
+	eHandle.GetEntity().SUB_Remove();
+}
+
 HookReturnCode PlayerPreThink(CBasePlayer@ pPlayer, uint& out uiFlags)
 {
 	if(pPlayer is null || !pPlayer.IsConnected())
@@ -7315,7 +7401,7 @@ HookReturnCode PlayerPreThink(CBasePlayer@ pPlayer, uint& out uiFlags)
 		}
 	}
 
-	//Real velocity, Used in pfnTouch
+	//Real velocity, Used in PlayerMove->pfnTouch
 	g_ArrayVelocityPlayer[playerIndex] = pPlayer.pev.velocity;
 
 	return HOOK_CONTINUE;
@@ -7412,7 +7498,7 @@ bool PlayerGrab( CBaseEntity@ pPlayer)
 
 	Vector dir = GetViewDir(pGrabber);
 	
-	Vector vecTarget = vecSrc + dir * 48.0;
+	Vector vecTarget = vecSrc + dir * c_PlayerGrab_Range;
 
 	TraceResult tr;
 	g_Utility.TraceHull( vecSrc, vecTarget, dont_ignore_monsters, head_hull, pGrabber.edict(), tr );
@@ -7431,7 +7517,7 @@ bool PlayerGrab( CBaseEntity@ pPlayer)
 
 			Vector vDiff = vecTarget - pHitEnt.pev.origin;
 
-			Vector vel = vDiff.Normalize() * 2500.0 * g_Engine.frametime;
+			Vector vel = vDiff.Normalize() * c_PlayerGrab_Velocity * g_Engine.frametime;
 
 			if(vel.z > 0.0)
 				vel.z = 0.0;
@@ -7475,6 +7561,7 @@ HookReturnCode PlayerUse(CBasePlayer@ pPlayer, uint& out uiFlags)
     return HOOK_CONTINUE;
 }
 
+/*
 const bool doCommand(CBasePlayer@ plr, const CCommand@ args, bool inConsole) {
 
   if (args.ArgC() >= 2 && args[0] == ".fgtest") {
@@ -7490,43 +7577,13 @@ const bool doCommand(CBasePlayer@ plr, const CCommand@ args, bool inConsole) {
   }
   else if (args.ArgC() == 1 && args[0] == ".fgtest") {
 
-		//plr.pev.origin = Vector(-6180, -6918, 1040);
-		//plr.pev.origin = Vector(-1608, -6604, 1068);
-		plr.pev.origin = Vector(-13397, 2938, 850);
-		return true;
-  }
-  else if (args.ArgC() == 1 && args[0] == ".fgtest2") {
-
-		Vector vOrigin = plr.pev.origin;
-
-		Vector vVelocity = GetAimDir(plr);
-		
-		vVelocity.x *= 500;
-		vVelocity.y *= 500;
-		vVelocity.z *= 500;
-
-		string m_szGibModelLeft = "models/fallguys/door4.mdl";
-
-		CBaseEntity@ pEntity = g_EntityFuncs.Create("env_physicmodel", vOrigin, g_vecZero, true);
-		
-		CEnvPhysicModel@pPhysic = cast<CEnvPhysicModel@>(CastToScriptClass(pEntity));
-
-		pEntity.pev.model = m_szGibModelLeft;
-		pEntity.pev.velocity = vVelocity;
-		pPhysic.m_vecHalfExtent = Vector(12, 38, 52);
-		pPhysic.m_flMass = 10.0;
-		
-		//Must set spawnflags before pfnSpawn call
-		pEntity.pev.spawnflags |= SF_ENV_PHYSMODEL_BOX;
-		pEntity.pev.spawnflags |= SF_ENV_PHYSMODEL_PUSHABLE;
-
-		g_EntityFuncs.DispatchSpawn(pEntity.edict());
-
+		plr.pev.origin = Vector(-6180, -6918, 1040);
+		plr.pev.origin = Vector(-1608, -6604, 1068);
+		plr.pev.origin = Vector(6509, 3456, -1860);
 		return true;
   }
   return false;
 }
-
 void consoleCmd(const CCommand@ args) {
   CBasePlayer@ plr = g_ConCommandSystem.GetCurrentPlayer();
   doCommand(plr, args, true);
@@ -7534,12 +7591,19 @@ void consoleCmd(const CCommand@ args) {
 
 CClientCommand _test("fgtest", "fgtest commands", @consoleCmd);
 CClientCommand _test2("fgtest2", "fgtest2 commands", @consoleCmd);
+*/
+
+void LoadScriptOK()
+{
+	CBaseEntity@ pEntity = null;
+	while((@pEntity = g_EntityFuncs.FindEntityByTargetname(pTarget, "load_script_error")) !is null)
+	{
+		pEntity.SUB_Remove();
+	}
+}
 
 void MapInit()
 {
-	string m_szGibModelLeft = "models/fallguys/door4.mdl";
-	g_Game.PrecacheModel( m_szGibModelLeft );
-
 	//Point entity
 	g_CustomEntityFuncs.RegisterCustomEntity( "CEnvPhysicModel", "env_physicmodel" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CEnvStudioModel", "env_studiomodel" );
@@ -7560,6 +7624,7 @@ void MapInit()
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerSortPanel", "trigger_sort_panel" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerToggleBSP", "trigger_toggle_bsp" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerCreateEnts", "trigger_create_ents" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerPlayerHat", "trigger_player_hat" );
 	
 	//Solid entity
 	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncRotatingFg", "func_rotating_fg" );
@@ -7641,6 +7706,8 @@ void MapInit()
     g_Hooks.RegisterHook(Hooks::Player::PlayerPostThink, @PlayerPostThink);
     g_Hooks.RegisterHook(Hooks::Player::PlayerPostThinkPost, @PlayerPostThinkPost);
     g_Hooks.RegisterHook(Hooks::Player::PlayerUse, @PlayerUse);
+
+	LoadScriptOK();
 }
 
 void PluginInit()
