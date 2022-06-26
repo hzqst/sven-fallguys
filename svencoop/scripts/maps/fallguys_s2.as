@@ -351,13 +351,16 @@ class CEnvPhysicModel : ScriptBaseEntity
 			((self.pev.spawnflags & SF_ENV_PHYSMODEL_PUSHABLE) == SF_ENV_PHYSMODEL_PUSHABLE) ? true : false);
 		}
 
-		g_EntityFuncs.SetEntityLevelOfDetail(self.edict(), 
-			LOD_BODY,
-			0, 0, //LoD 0
-			self.pev.iuser1, self.pev.fuser1, 0,//LoD 1
-			self.pev.iuser2, self.pev.fuser2, 0,//LoD 2
-			self.pev.iuser3, self.pev.fuser3, 0 //LoD 3
-		);
+		if(self.pev.fuser1 > 0 || self.pev.fuser2 > 0 || self.pev.fuser3 > 0)
+		{
+			g_EntityFuncs.SetEntityLevelOfDetail(self.edict(), 
+				LOD_BODY,
+				0, 0, //LoD 0
+				self.pev.iuser1, 0, self.pev.fuser1, //LoD 1
+				self.pev.iuser2, 0, self.pev.fuser2, //LoD 2
+				self.pev.iuser3, 0, self.pev.fuser3 //LoD 3
+			);
+		}
 	}
 
 	void Touch( CBaseEntity@ pOther )
@@ -420,13 +423,16 @@ class CEnvStudioModel : ScriptBaseEntity
 			SetThink(ThinkFunction(this.Animate));
 		}
 
-		g_EntityFuncs.SetEntityLevelOfDetail(self.edict(), 
-			LOD_BODY,
-			0, 0, //LoD 0
-			self.pev.iuser1, self.pev.fuser1, 0,//LoD 1
-			self.pev.iuser2, self.pev.fuser2, 0,//LoD 2
-			self.pev.iuser3, self.pev.fuser3, 0 //LoD 3
-		);
+		if(self.pev.fuser1 > 0 || self.pev.fuser2 > 0 || self.pev.fuser3 > 0)
+		{
+			g_EntityFuncs.SetEntityLevelOfDetail(self.edict(), 
+				LOD_BODY,
+				0, 0, //LoD 0
+				self.pev.iuser1, 0, self.pev.fuser1, //LoD 1
+				self.pev.iuser2, 0, self.pev.fuser2, //LoD 2
+				self.pev.iuser3, 0, self.pev.fuser3 //LoD 3
+			);
+		}
 	}
 
 	bool KeyValue( const string & in szKey, const string & in szValue )
@@ -6290,16 +6296,6 @@ class CTriggerSortPanel : ScriptBaseEntity
 		return BaseClass.KeyValue( szKey, szValue );
 	}
 
-	void ClearErrors()
-	{
-		//Clear load_script_error
-		CBaseEntity@ pEntity = null;
-		while((@pEntity = g_EntityFuncs.FindEntityByTargetname(pEntity, "load_script_error")) !is null)
-		{
-			pEntity.SUB_Remove();
-		}
-	}
-
 	void SortPanels()
 	{
 		array<CBaseEntity@> arrayPanelEntities = {};
@@ -7605,8 +7601,21 @@ CClientCommand _test("fgtest", "fgtest commands", @consoleCmd);
 CClientCommand _test2("fgtest2", "fgtest2 commands", @consoleCmd);
 */
 
+void ClearErrors()
+{
+	//Clear load_script_error
+	CBaseEntity@ pEntity = null;
+	while((@pEntity = g_EntityFuncs.FindEntityByTargetname(pEntity, "script_load_error")) !is null)
+	{
+		pEntity.SUB_Remove();
+	}
+}
+
 void MapInit()
 {
+
+	ClearErrors();
+
 	//Point entity
 	g_CustomEntityFuncs.RegisterCustomEntity( "CEnvPhysicModel", "env_physicmodel" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CEnvStudioModel", "env_studiomodel" );
@@ -7710,7 +7719,6 @@ void MapInit()
     g_Hooks.RegisterHook(Hooks::Player::PlayerPostThinkPost, @PlayerPostThinkPost);
     g_Hooks.RegisterHook(Hooks::Player::PlayerUse, @PlayerUse);
 
-	LoadScriptOK();
 }
 
 void PluginInit()
