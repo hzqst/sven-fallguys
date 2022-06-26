@@ -6290,6 +6290,16 @@ class CTriggerSortPanel : ScriptBaseEntity
 		return BaseClass.KeyValue( szKey, szValue );
 	}
 
+	void ClearErrors()
+	{
+		//Clear load_script_error
+		CBaseEntity@ pEntity = null;
+		while((@pEntity = g_EntityFuncs.FindEntityByTargetname(pEntity, "load_script_error")) !is null)
+		{
+			pEntity.SUB_Remove();
+		}
+	}
+
 	void SortPanels()
 	{
 		array<CBaseEntity@> arrayPanelEntities = {};
@@ -6343,6 +6353,7 @@ class CTriggerSortPanel : ScriptBaseEntity
 	{
 		if(useType == USE_ON)
 		{
+			ClearErrors();
 			SortPanels();
 		}
 		else if(useType == USE_OFF)
@@ -6351,6 +6362,7 @@ class CTriggerSortPanel : ScriptBaseEntity
 		}
 		else if(useType == USE_TOGGLE)
 		{
+			ClearErrors();
 			SortPanels();
 		}
 		else if(useType == USE_SET)
@@ -7592,15 +7604,6 @@ void consoleCmd(const CCommand@ args) {
 CClientCommand _test("fgtest", "fgtest commands", @consoleCmd);
 CClientCommand _test2("fgtest2", "fgtest2 commands", @consoleCmd);
 */
-
-void LoadScriptOK()
-{
-	CBaseEntity@ pEntity = null;
-	while((@pEntity = g_EntityFuncs.FindEntityByTargetname(pTarget, "load_script_error")) !is null)
-	{
-		pEntity.SUB_Remove();
-	}
-}
 
 void MapInit()
 {
