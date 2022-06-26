@@ -1,6 +1,17 @@
+const float c_PlayerImpactPlayer_MinimumCosAngle = 0.3;
+const float c_PlayerImpactPlayer_MinimumImpactVelocity = 100;
+const float c_PlayerImpactPlayer_VelocityTransferEfficiency = 0.75;
+
+const int LOD_BODY = 1;
+const int LOD_MODELINDEX = 2;
+const int LOD_SCALE = 4;
+const int LOD_SCALE_INTERP = 8;
 
 const int FL_ONGROUND = (1<<9);
 const int FL_BASEVELOCITY = (1<<22);
+
+const int EF_FRAMEANIMTEXTURES =  512;
+const int EF_NODECALS =  2048;
 
 const int SF_BRUSH_ROTATE_INSTANT = 1;
 const int SF_BRUSH_ROTATE_BACKWARDS = 2;
@@ -39,6 +50,16 @@ const int SF_DOOR_ROTATE_X = 128;
 const int SF_DOOR_USE_ONLY = 256;
 const int SF_DOOR_NOMONSTERS = 512;
 
+const int FCAP_CUSTOMSAVE = 0x00000001;
+const int FCAP_ACROSS_TRANSITION = 0x00000002;
+const int FCAP_MUST_SPAWN = 0x00000004;
+const int FCAP_IMPULSE_USE = 0x00000008;
+const int FCAP_CONTINUOUS_USE = 0x00000010;
+const int FCAP_ONOFF_USE = 0x00000020;
+const int FCAP_DIRECTIONAL_USE = 0x00000040;
+const int FCAP_MASTER = 0x00000080;
+const int FCAP_FORCE_TRANSITION = 0x00000080;
+
 const int TASKSTATUS_NEW				= 0;			// Just started
 const int TASKSTATUS_RUNNING			= 1;			// Running task & movement
 const int TASKSTATUS_RUNNING_MOVEMENT	= 2;			// Just running movement
@@ -64,9 +85,13 @@ array<CPlayerBlockStateItem> g_ArrayBlockPlayer(33);
 
 array<int> g_ArrayGrabPlayer(33);
 
+array<Vector> g_ArrayVelocityPlayer(33);
 array<Vector> g_ArrayBounceVelocityPlayer(33);
 array<float> g_ArrayBouncePlayer(33);
 array<float> g_ArraySlidePlayer(33);
+array<float> g_ArrayJumpPlayer(33);
+array<int> g_ArrayPlayerJumpState(33);
+array<int> g_ArrayPlayerJumpPreGroundEntity(33);
 
 array<bool> g_ArrayFallingPlayer(33);
 array<string> g_ArrayFallingPlayerPlayingSound(33);
@@ -90,11 +115,280 @@ const int g_iLodStudioModelMagicNumber = 1919811;
 int g_iPlayerArrowSpriteModelIndex = 0;
 int g_iPlayerArrowSprite2ModelIndex = 0;
 
+const int SF_ENV_PHYSMODEL_BOX = 1;
+const int SF_ENV_PHYSMODEL_PUSHABLE = 128;
+
+class CEnvSkinButton : ScriptBaseEntity
+{
+	Vector m_vecMinHullSize = g_vecZero;
+	Vector m_vecMaxHullSize = g_vecZero;
+	int m_iMinSkin = 0;
+	int m_iMaxSkin = 0;
+	int m_iTriggerState = 0;
+	float m_flClickDelay = 0.1;
+	float m_flLastClick = 0;
+
+	string m_szPressSound = "";
+
+	void Precache()
+	{
+		BaseClass.Precache();
+
+		g_Game.PrecacheModel( self.pev.model );
+
+		if(!m_szPressSound.IsEmpty())
+			g_SoundSystem.PrecacheSound( m_szPressSound );
+	}
+
+	int ObjectCaps() { 
+		return FCAP_IMPULSE_USE;
+	}
+
+	void Spawn()
+	{
+		Precache();
+
+		self.pev.solid = SOLID_BBOX;
+		self.pev.movetype = MOVETYPE_NONE;
+
+		g_EntityFuncs.SetModel( self, self.pev.model );
+		g_EntityFuncs.SetSize( self.pev, m_vecMinHullSize, m_vecMaxHullSize );
+		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+	}
+
+	bool KeyValue( const string & in szKey, const string & in szValue )
+	{
+		if(szKey == "minhullsize"){
+			g_Utility.StringToVector( m_vecMinHullSize, szValue );
+			return true;
+		}
+
+		if(szKey == "maxhullsize"){
+			g_Utility.StringToVector( m_vecMaxHullSize, szValue );
+			return true;
+		}
+
+		if(szKey == "minskin"){
+			m_iMinSkin = atoi(szValue);
+			return true;
+		}
+
+		if(szKey == "maxskin"){
+			m_iMaxSkin = atoi(szValue);
+			return true;
+		}
+
+		if(szKey == "triggerstate"){
+			m_iTriggerState = atoi(szValue);
+			return true;
+		}
+
+		if(szKey == "clickdelay"){
+			m_flClickDelay = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "presssound"){
+			m_szPressSound = szValue;
+			return true;
+		}
+
+		return BaseClass.KeyValue( szKey, szValue );
+	}
+
+	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
+	{
+		if(useType == USE_ON)
+		{
+			self.pev.spawnflags |= 1;
+			if((self.pev.spawnflags & 2) == 2)
+			{
+				self.pev.effects &= ~EF_NODRAW;
+			}
+		}
+		else if(useType == USE_OFF)
+		{
+			self.pev.spawnflags &= ~1;
+			if((self.pev.spawnflags & 2) == 2)
+			{
+				self.pev.effects |= EF_NODRAW;
+			}
+		}
+		else if(useType == USE_SET && flValue == 1)
+		{
+			if((self.pev.spawnflags & 1) == 1)
+			{
+				if(g_Engine.time > m_flLastClick + m_flClickDelay)
+				{
+					m_flLastClick = g_Engine.time;
+
+					self.pev.skin = self.pev.skin + 1;
+					if(self.pev.skin > m_iMaxSkin)
+						self.pev.skin = m_iMinSkin;
+
+					if(!m_szPressSound.IsEmpty() && pActivator !is null && pActivator.IsPlayer()){
+						
+						g_SoundSystem.EmitSoundDyn( pActivator.edict(), CHAN_ITEM, m_szPressSound, 1, ATTN_NORM, 0, PITCH_NORM );
+
+					}
+
+					if(!string(self.pev.target).IsEmpty())
+					{
+						g_EntityFuncs.FireTargets( string(self.pev.target), ((self.pev.spawnflags & 1) == 1) ? pActivator : self, self, USE_TYPE(m_iTriggerState), self.pev.skin );
+					}
+				}				
+			}
+		}
+	}
+}
+
+class CEnvPhysicModel : ScriptBaseEntity
+{
+	Vector m_vecHalfExtent = Vector(1.0, 1.0, 1.0);
+	float m_flMass = 10.0;
+	float m_flLinearFriction = 1.0;
+	float m_flRollingFriction = 1.0;
+	float m_flRestitution = 0;
+	float m_flCCDRadius = 0.1;
+	float m_flCCDThreshold = 0.02;
+
+	void Precache()
+	{
+		BaseClass.Precache();
+
+		g_Game.PrecacheModel( self.pev.model );
+	}
+
+	bool KeyValue( const string & in szKey, const string & in szValue )
+	{
+		if(szKey == "lod1"){
+			self.pev.fuser1 = atof(szValue);
+			return true;
+		}
+		if(szKey == "lod1body"){
+			self.pev.iuser1 = atoi(szValue);
+			return true;
+		}
+		if(szKey == "lod2"){
+			self.pev.fuser2 = atof(szValue);
+			return true;
+		}
+		if(szKey == "lod2body"){
+			self.pev.iuser2 = atoi(szValue);
+			return true;
+		}
+		if(szKey == "lod3"){
+			self.pev.fuser3 = atof(szValue);
+			return true;
+		}
+		if(szKey == "lod3body"){
+			self.pev.iuser3 = atoi(szValue);
+			return true;
+		}
+
+		if(szKey == "mass"){
+			m_flMass = atof(szValue);
+			return true;
+		}
+		if(szKey == "linearfriction"){
+			m_flLinearFriction = atof(szValue);
+			return true;
+		}
+		if(szKey == "rollingfriction"){
+			m_flRollingFriction = atof(szValue);
+			return true;
+		}
+		if(szKey == "restitution"){
+			m_flRestitution = atof(szValue);
+			return true;
+		}
+		if(szKey == "ccdradius"){
+			m_flCCDRadius = atof(szValue);
+			return true;
+		}
+		if(szKey == "ccdthreshold"){
+			m_flCCDThreshold = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "halfextent"){
+			g_Utility.StringToVector( m_vecHalfExtent, szValue );
+			return true;
+		}
+
+		return BaseClass.KeyValue( szKey, szValue );
+	}
+
+	void Spawn()
+	{
+		Precache();
+
+		self.pev.solid = SOLID_BBOX;
+		self.pev.movetype = MOVETYPE_NOCLIP;
+
+		//self.pev.iuser4 = g_iLodStudioModelMagicNumber;
+
+		g_EntityFuncs.SetModel( self, self.pev.model );
+
+		Vector mins = m_vecHalfExtent * -1;
+		Vector maxs = m_vecHalfExtent;
+		g_EntityFuncs.SetSize( self.pev, mins, maxs );
+		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+
+		if((self.pev.spawnflags & SF_ENV_PHYSMODEL_BOX) == SF_ENV_PHYSMODEL_BOX)
+		{
+			g_EntityFuncs.CreatePhysicBox(self.edict(),
+			m_flMass,
+			m_flLinearFriction,
+			m_flRollingFriction,
+			m_flRestitution,
+			m_flCCDRadius,
+			m_flCCDThreshold,
+			((self.pev.spawnflags & SF_ENV_PHYSMODEL_PUSHABLE) == SF_ENV_PHYSMODEL_PUSHABLE) ? true : false);
+		}
+
+		g_EntityFuncs.SetEntityLevelOfDetail(self.edict(), 
+			LOD_BODY,
+			0, 0, //LoD 0
+			self.pev.iuser1, self.pev.fuser1, 0,//LoD 1
+			self.pev.iuser2, self.pev.fuser2, 0,//LoD 2
+			self.pev.iuser3, self.pev.fuser3, 0 //LoD 3
+		);
+	}
+
+	void Touch( CBaseEntity@ pOther )
+	{
+		if(pOther.IsPlayer() && pOther.IsAlive())
+		{
+			if((pOther.pev.flags & FL_ONGROUND) == FL_ONGROUND && (pOther.pev.groundentity is self.edict() ))
+			{
+				
+			}
+			else
+			{
+				//All calls are from PlayerMove -> SV_Impact, do we really need this check?
+				if(g_EngineFuncs.GetRunPlayerMovePlayerIndex() == pOther.entindex())
+				{
+					Vector vecImpactVelocity = pOther.pev.velocity;
+					Vector vecPhysicVelocity = self.pev.vuser2;
+
+					float flCosAngle = DotProduct(vecImpactVelocity, vecPhysicVelocity);
+					if(flCosAngle > 0.3)
+					{
+
+					}
+				}
+			}
+		}
+	}
+}
+
 class CEnvStudioModel : ScriptBaseEntity
 {
 	CBaseEntity @m_CopyFromEntity = null;
 	Vector m_OriginOffset = g_vecZero;
 	Vector m_AnglesOffset = g_vecZero;
+	float m_flUpdateRate = 0;
 
 	void Precache()
 	{
@@ -110,7 +404,7 @@ class CEnvStudioModel : ScriptBaseEntity
 		self.pev.solid = SOLID_NOT;
 		self.pev.movetype = MOVETYPE_NONE;
 
-		self.pev.iuser4 = g_iLodStudioModelMagicNumber;
+		//self.pev.iuser4 = g_iLodStudioModelMagicNumber;
 
 		g_EntityFuncs.SetModel( self, self.pev.model );
 		g_EntityFuncs.SetSize( self.pev, self.pev.mins, self.pev.maxs );
@@ -121,10 +415,18 @@ class CEnvStudioModel : ScriptBaseEntity
 			self.pev.nextthink = g_Engine.time + 1.5;
 			SetThink(ThinkFunction(this.Animate));
 		}
+
+		g_EntityFuncs.SetEntityLevelOfDetail(self.edict(), 
+			LOD_BODY,
+			0, 0, //LoD 0
+			self.pev.iuser1, self.pev.fuser1, 0,//LoD 1
+			self.pev.iuser2, self.pev.fuser2, 0,//LoD 2
+			self.pev.iuser3, self.pev.fuser3, 0 //LoD 3
+		);
 	}
 
 	bool KeyValue( const string & in szKey, const string & in szValue )
-	{	
+	{
 		if(szKey == "lod1"){
 			self.pev.fuser1 = atof(szValue);
 			return true;
@@ -160,12 +462,25 @@ class CEnvStudioModel : ScriptBaseEntity
 			return true;
 		}
 
+		if(szKey == "updaterate"){
+			m_flUpdateRate = atof(szValue);
+			return true;
+		}
+
 		return BaseClass.KeyValue( szKey, szValue );
 	}
 
 	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
 	{
-		if(useType == USE_SET)
+		if(useType == USE_ON)
+		{
+			self.pev.effects &= ~EF_NODRAW;
+		}
+		else if(useType == USE_OFF)
+		{
+			self.pev.effects |= EF_NODRAW;
+		}
+		else if(useType == USE_SET)
 		{
 			if((self.pev.spawnflags & 4) == 4)
 			{
@@ -213,6 +528,7 @@ class CEnvStudioModel : ScriptBaseEntity
 				return;
 
 			@m_CopyFromEntity = @pTarget;
+			//Client do interpolation for MOVETYPE_NOCLIP
 			self.pev.movetype = MOVETYPE_NOCLIP;
 		}
 
@@ -234,7 +550,15 @@ class CEnvStudioModel : ScriptBaseEntity
 			self.pev.origin = self.pev.origin + m_OriginOffset;
 		}	
 
-		self.pev.nextthink = g_Engine.time;
+		if((self.pev.spawnflags & 64) == 64)
+		{
+			if((m_CopyFromEntity.pev.effects & EF_NODRAW) == EF_NODRAW)
+				self.pev.effects |= EF_NODRAW;
+			else
+				self.pev.effects &= ~EF_NODRAW;
+		}
+
+		self.pev.nextthink = g_Engine.time + m_flUpdateRate;
 	}
 
 	void RestoreFxAnimate()
@@ -266,6 +590,8 @@ class CFuncRotatingFg : ScriptBaseEntity
 	float m_flBounceDrumPitch = 0.0;
 	string m_szBounceDrumStudioModel = "";
 	float m_flLastBounceTime = 0.0;
+
+	bool m_bIsSuperPusher = false;
 
 	array<string> m_szHitSoundName = {
 		"fallguys/impact1.ogg",
@@ -377,6 +703,9 @@ class CFuncRotatingFg : ScriptBaseEntity
 			NextThink(self.pev.ltime + 10.0, false);
 			SetThink(ThinkFunction(this.Rotate));
 		}
+
+		if(m_bIsSuperPusher)
+			g_EntityFuncs.SetEntitySuperPusher(self.edict(), true);
 	}
 
 	bool KeyValue( const string & in szKey, const string & in szValue )
@@ -483,6 +812,11 @@ class CFuncRotatingFg : ScriptBaseEntity
 
 		if(szKey == "slidesound"){
 			m_szSlideSoundName = szValue;
+			return true;
+		}
+
+		if(szKey == "superpusher"){
+			m_bIsSuperPusher = atoi(szValue) > 0 ? true : false;
 			return true;
 		}
 
@@ -701,13 +1035,16 @@ class CFuncRotatingFg : ScriptBaseEntity
 		if(!pOther.IsAlive())
 			return;
 
-		if(self.pev.sequence == 1919810)
+		//This is not PM code, velocity works
+		Vector vecSuperPusherPushingVector;
+		if(g_EntityFuncs.GetCurrentSuperPusher(vecSuperPusherPushingVector) is self.edict())
 		{
 			if(m_flPushForce > 0)
 			{
 				float flForce = CalcDynamicForce(m_flPushForce);
 
-				Vector vDir = self.pev.vuser1;
+				Vector vDir = vecSuperPusherPushingVector;
+
 				vDir = vDir.Normalize();
 
 				pOther.pev.velocity = vDir * flForce;
@@ -755,6 +1092,7 @@ class CFuncRotatingFg : ScriptBaseEntity
 			return;
 		}
 
+		//PM code, velocity not works
 		if((self.pev.spawnflags & (SF_BRUSH_ROTATE_Z_AXIS | SF_BRUSH_ROTATE_X_AXIS)) == 0)
 		{
 			if(m_flBounceDrumForce > 0)
@@ -802,7 +1140,7 @@ class CFuncRotatingFg : ScriptBaseEntity
 						{
 							float flMaxVelocity = CalcDynamicForce(m_flMaxVelocity);
 
-							if(DotProduct(pOther.pev.velocity, vRight) > flMaxVelocity)
+							if(DotProduct(g_ArrayVelocityPlayer[pOther.entindex()], vRight) > flMaxVelocity)
 								return;
 						}
 
@@ -823,7 +1161,7 @@ class CFuncRotatingFg : ScriptBaseEntity
 						{
 							float flMaxVelocity = CalcDynamicForce(m_flMaxVelocity);
 
-							if(DotProduct(pOther.pev.velocity, vLeft) > flMaxVelocity)
+							if(DotProduct(g_ArrayVelocityPlayer[pOther.entindex()], vLeft) > flMaxVelocity)
 								return;
 						}
 
@@ -995,6 +1333,8 @@ class CFuncTrainFg : ScriptBaseEntity
 	float m_flBlockUpForce = 0.0;
 	float m_flBlockCrushTime = 4.0;
 
+	bool m_bIsSuperPusher = false;
+
 	array<string> m_szBounceSoundName = {
 		"fallguys/bounce.ogg",
 		"fallguys/bounce2.ogg",
@@ -1096,6 +1436,11 @@ class CFuncTrainFg : ScriptBaseEntity
 			return true;
 		}
 
+		if(szKey == "superpusher"){
+			m_bIsSuperPusher = atoi(szValue) > 0 ? true : false;
+			return true;
+		}
+
 		return BaseClass.KeyValue( szKey, szValue );
 	}
 
@@ -1163,6 +1508,9 @@ class CFuncTrainFg : ScriptBaseEntity
 		g_EntityFuncs.SetOrigin( self, self.pev.origin );
 
 		m_activated = false;
+
+		if(m_bIsSuperPusher)
+			g_EntityFuncs.SetEntitySuperPusher(self.edict(), true);
 	}
 
 	void Touch( CBaseEntity@ pOther )
@@ -1173,12 +1521,16 @@ class CFuncTrainFg : ScriptBaseEntity
 		if(!pOther.IsAlive())
 			return;
 
-		if(self.pev.sequence == 1919810)
+		//not PM code, velocity works
+		Vector vecSuperPusherPushingVector;
+		if(g_EntityFuncs.GetCurrentSuperPusher(vecSuperPusherPushingVector) is self.edict())
 		{
 			if(m_flPushForce > 0.0)
 			{
-				Vector vDir = self.pev.vuser1;
+				Vector vDir = vecSuperPusherPushingVector;
+
 				vDir = vDir.Normalize();
+				
 				pOther.pev.velocity = vDir * m_flPushForce;		
 
 				if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
@@ -1206,6 +1558,7 @@ class CFuncTrainFg : ScriptBaseEntity
 			return;
 		}
 
+		//PM code
 		if(m_flBounceForce > 0)
 		{
 			if((pOther.pev.flags & FL_ONGROUND) == FL_ONGROUND && (pOther.pev.groundentity is self.edict() ))
@@ -1480,6 +1833,8 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 	float m_flBlockUpForce = 0.0;
 	float m_flBlockCrushTime = 4.0;
 
+	bool m_bIsSuperPusher = false;
+
 	array<string> m_szHitSoundName = {
 		"fallguys/impact1.ogg",
 		"fallguys/impact2.ogg",
@@ -1555,6 +1910,9 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 		NextThink( self.pev.ltime + 0.1, false );
 		SetThink( ThinkFunction( this.Find ) );
 		Precache();
+
+		if(m_bIsSuperPusher)
+			g_EntityFuncs.SetEntitySuperPusher(self.edict(), true);
 	}
 
 	bool KeyValue( const string & in szKey, const string & in szValue )
@@ -1626,6 +1984,11 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 
 		if(szKey == "blockcrushtime"){
 			m_flBlockCrushTime = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "superpusher"){
+			m_bIsSuperPusher = atoi(szValue) > 0 ? true : false;
 			return true;
 		}
 
@@ -1712,12 +2075,16 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 		if(!pOther.IsAlive())
 			return;
 
-		if(self.pev.sequence == 1919810)
+		//Not PM code
+		Vector vecSuperPusherPushingVector;
+		if(g_EntityFuncs.GetCurrentSuperPusher(vecSuperPusherPushingVector) is self.edict())
 		{
 			if(m_flPushForce > 0)
 			{
-				Vector vDir = self.pev.vuser1;
+				Vector vDir = vecSuperPusherPushingVector;
+				
 				vDir = vDir.Normalize();
+
 				pOther.pev.velocity = vDir * m_flPushForce;		
 
 				if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
@@ -2255,7 +2622,45 @@ class CFuncLever : ScriptBaseEntity
 				CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
 				if(pPlayer !is null && pPlayer.IsAlive())
 				{
-					if((pPlayer.pev.flags & FL_ONGROUND) == FL_ONGROUND && (pPlayer.pev.groundentity is self.edict() ))
+					if ( g_ArrayPlayerJumpState[i] == 2 && g_ArrayPlayerJumpPreGroundEntity[i] == self.entindex() )
+					{
+						//g_Game.AlertMessage( at_console, "someone is jumping\n" );
+
+						float flAngle = 0;
+						float flOffset = 0;
+						Vector v1 = pPlayer.pev.origin;
+						Vector v2 = self.pev.origin;
+						if ((self.pev.spawnflags & 1) == 1)
+						{
+							v1.x = v2.x;
+							v1.z -= pPlayer.pev.maxs.z;
+							flOffset = (v1-v2).Length();
+							flAngle = self.pev.angles.z;
+
+							if(v1.y > v2.y)
+								flOffset *= -1.0;
+						}
+						else if ((self.pev.spawnflags & 2) == 2)
+						{
+							v1.y = v2.y;
+							v1.z -= pPlayer.pev.maxs.z;
+							flOffset = (v1-v2).Length();
+							flAngle = self.pev.angles.x;
+
+							if(v1.x > v2.x)
+								flOffset *= -1.0;
+						}
+
+						float flGravity = 800 * 50;
+
+						float flAngleDiff = 90 - flAngle;
+						float flMomentOfForce = flGravity * flOffset * sin(flAngleDiff * 2 * 3.14159 / 360.0);
+						
+						flMomentOfForceTotal += flMomentOfForce;
+						flNumForce += 1.0;
+					}
+
+					else if((pPlayer.pev.flags & FL_ONGROUND) == FL_ONGROUND && (pPlayer.pev.groundentity is self.edict() ))
 					{
 						float flAngle = 0;
 						float flOffset = 0;
@@ -2436,6 +2841,7 @@ class CFuncBarrier : ScriptBaseEntity
 		if(!pOther.IsAlive())
 			return;
 
+		//PM code, velocity not work
 		if((pOther.pev.flags & FL_ONGROUND) == FL_ONGROUND && (pOther.pev.groundentity is self.edict() ))
 		{
 			if(m_flSlideForce > 0)
@@ -2446,7 +2852,7 @@ class CFuncBarrier : ScriptBaseEntity
 
 				if(DotProduct(vDiff, m_vecLeft) > 0)
 				{
-					if(m_flSlideMaxVelocity > 0 && DotProduct(pOther.pev.velocity, m_vecLeft) > m_flSlideMaxVelocity)
+					if(m_flSlideMaxVelocity > 0 && DotProduct(g_ArrayVelocityPlayer[pOther.entindex()], m_vecLeft) > m_flSlideMaxVelocity)
 						return;
 
 					pOther.pev.basevelocity = m_vecLeft * m_flSlideForce;
@@ -2463,7 +2869,7 @@ class CFuncBarrier : ScriptBaseEntity
 				}
 				else if(DotProduct(vDiff, m_vecRight) > 0)
 				{
-					if(m_flSlideMaxVelocity > 0 && DotProduct(pOther.pev.velocity, m_vecRight) > m_flSlideMaxVelocity)
+					if(m_flSlideMaxVelocity > 0 && DotProduct(g_ArrayVelocityPlayer[pOther.entindex()], m_vecRight) > m_flSlideMaxVelocity)
 						return;
 
 					pOther.pev.basevelocity = m_vecRight * m_flSlideForce;
@@ -2721,14 +3127,8 @@ class CFuncBounceDrum : ScriptBaseEntity
 		{
 			if(m_flBounceForce > 0.0)
 			{
-				g_ArrayBounceVelocityPlayer[pOther.entindex()] = m_vecBounceVector* m_flBounceForce;
+				g_ArrayBounceVelocityPlayer[pOther.entindex()] = m_vecBounceVector * m_flBounceForce;
 				
-				//Vector vDiff = pOther.pev.origin - self.pev.origin;
-				//vDiff.z = 0;
-				//vDiff = vDiff.Normalize();
-
-				//g_ArrayBounceVelocityPlayer[pOther.entindex()] = vDiff * m_flBounceForce;
-
 				if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
 
 					g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szBounceSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
@@ -2748,15 +3148,12 @@ class CFuncBounceDrum : ScriptBaseEntity
 			}
 		}
 	}
-
-	void RestoreAnim()
-	{
-		
-	}
 }
 
 class CFuncPendulum2 : ScriptBaseEntity
 {
+	Vector m_vecInitialAngles;
+
 	float m_flDistance = 0.0;
 	float m_flConstant = 0.0;
 
@@ -2766,6 +3163,8 @@ class CFuncPendulum2 : ScriptBaseEntity
 	float m_flBlockPushForce = 0.0;
 	float m_flBlockUpForce = 0.0;
 	float m_flBlockCrushTime = 4.0;
+
+	bool m_bIsSuperPusher = false;
 
 	array<string> m_szHitSoundName = {
 		"fallguys/impact.ogg",
@@ -2796,6 +3195,14 @@ class CFuncPendulum2 : ScriptBaseEntity
 		g_SoundSystem.PrecacheSound( m_szBlockSoundName );
 	}
 
+	void Restart()
+	{
+		self.pev.angles = m_vecInitialAngles;
+		self.pev.avelocity = g_vecZero;
+		NextThink(self.pev.ltime + 0.1, false);
+		SetThink(ThinkFunction(this.Rotate));
+	}
+
 	void Spawn()
 	{
 		Precache();
@@ -2821,6 +3228,8 @@ class CFuncPendulum2 : ScriptBaseEntity
 		if (self.pev.speed == 0)
 			self.pev.speed = 100;
 
+		m_vecInitialAngles = self.pev.angles;
+
 		m_flConstant = (self.pev.speed * self.pev.speed) * 0.5;
 
 		if(m_flDistance > 90)
@@ -2836,6 +3245,9 @@ class CFuncPendulum2 : ScriptBaseEntity
 			NextThink(g_Engine.time + 1.5, false);
 			SetThink(ThinkFunction(this.SUB_CallUseToggle));
 		}
+
+		if(m_bIsSuperPusher)
+			g_EntityFuncs.SetEntitySuperPusher(self.edict(), true);
 	}
 
 	bool KeyValue( const string & in szKey, const string & in szValue )
@@ -2887,6 +3299,11 @@ class CFuncPendulum2 : ScriptBaseEntity
 
 		if(szKey == "blockcrushtime"){
 			m_flBlockCrushTime = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "superpusher"){
+			m_bIsSuperPusher = atoi(szValue) > 0 ? true : false;
 			return true;
 		}
 
@@ -2970,7 +3387,7 @@ class CFuncPendulum2 : ScriptBaseEntity
 		}
 		else if(useType == USE_ON)
 		{
-			g_Game.AlertMessage( at_console, "Turning on %1\n", string(self.pev.targetname));
+			//g_Game.AlertMessage( at_console, "Turning on %1\n", string(self.pev.targetname));
 
 			if (!IsRotating())
 			{
@@ -2993,6 +3410,10 @@ class CFuncPendulum2 : ScriptBaseEntity
 		{
 
 		}
+		else if(useType == USE_SET && flValue < 0.0)
+		{
+			Restart();
+		}
 	}
 
 	void Touch( CBaseEntity@ pOther )
@@ -3003,11 +3424,13 @@ class CFuncPendulum2 : ScriptBaseEntity
 		if(!pOther.IsAlive())
 			return;
 
-		if(self.pev.sequence == 1919810)
+		//Not PM code, velocity works
+		Vector vecSuperPusherPushingVector;
+		if(g_EntityFuncs.GetCurrentSuperPusher(vecSuperPusherPushingVector) is self.edict())
 		{
 			if(m_flPushForce > 0.0)
 			{
-				Vector vDir = self.pev.vuser1;
+				Vector vDir = vecSuperPusherPushingVector;
 				vDir = vDir.Normalize();
 				pOther.pev.velocity = vDir * m_flPushForce;		
 
@@ -3035,6 +3458,7 @@ class CFuncPendulum2 : ScriptBaseEntity
 			return;
 		}
 
+		//PM code, velocity don't work
 		if(m_flBounceForce > 0)
 		{
 			if((pOther.pev.flags & FL_ONGROUND) == FL_ONGROUND && (pOther.pev.groundentity is self.edict() ))
@@ -3183,6 +3607,568 @@ class CFuncPendulum2 : ScriptBaseEntity
 	}
 }
 
+class CFuncBreakDoor : ScriptBaseEntity
+{
+	int m_iInitialSpawnFlags = 0;
+	float m_flMinImpactVelocity = 0.0;
+	Vector m_vecImpactAngles = g_vecZero;
+	Vector m_vecImpactDir = g_vecZero;
+
+	string m_szGibModelLeft = "models/fallguys/door4.mdl";
+	string m_szGibModelRight = "models/fallguys/door5.mdl";
+	string m_szGibModelTop = "models/fallguys/door6.mdl";
+
+	int m_iGibModelLeft = 0;
+	int m_iGibModelRight = 0;
+	int m_iGibModelTop = 0;
+
+	string m_szBeepSoundName = "fallguys/doorbeep.ogg";
+
+	array<string> m_szHitSoundName = {
+		"fallguys/doorhit.ogg",
+		"fallguys/doorhit2.ogg",
+		"fallguys/doorhit3.ogg",
+		"fallguys/doorhit4.ogg"
+	};
+
+	void Precache()
+	{
+		BaseClass.Precache();
+		
+		g_SoundSystem.PrecacheSound( m_szBeepSoundName );
+
+		g_SoundSystem.PrecacheSound( m_szHitSoundName[0] );
+		g_SoundSystem.PrecacheSound( m_szHitSoundName[1] );
+		g_SoundSystem.PrecacheSound( m_szHitSoundName[2] );
+		g_SoundSystem.PrecacheSound( m_szHitSoundName[3] );
+
+		m_iGibModelLeft = g_Game.PrecacheModel( m_szGibModelLeft );
+		m_iGibModelRight = g_Game.PrecacheModel( m_szGibModelRight );
+		m_iGibModelTop = g_Game.PrecacheModel( m_szGibModelTop );
+	}
+
+	void Spawn()
+	{
+		Precache();
+
+		if(self.pev.health > 0)
+			self.pev.takedamage = DAMAGE_YES;
+		else
+			self.pev.takedamage = DAMAGE_NO;
+
+		self.pev.deadflag = DEAD_NO;
+		self.pev.solid = SOLID_BSP;
+		self.pev.movetype = MOVETYPE_PUSH;
+
+		g_EntityFuncs.SetModel( self, self.pev.model );
+		g_EntityFuncs.SetSize( self.pev, self.pev.mins, self.pev.maxs );
+		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+
+		m_iInitialSpawnFlags = self.pev.spawnflags;
+
+		Math.MakeVectors( m_vecImpactAngles );
+
+		m_vecImpactDir = g_Engine.v_forward;
+
+	}
+
+	void Restart()
+	{
+		if(self.pev.health > 0)
+			self.pev.takedamage = DAMAGE_YES;
+		else
+			self.pev.takedamage = DAMAGE_NO;
+			
+		self.pev.effects &= ~EF_NODRAW;
+		self.pev.deadflag = DEAD_NO;
+		self.pev.solid = SOLID_BSP;
+		self.pev.movetype = MOVETYPE_PUSH;
+
+		self.pev.spawnflags = m_iInitialSpawnFlags;
+	}
+
+	bool KeyValue( const string & in szKey, const string & in szValue )
+	{
+		if(szKey == "minimpactvelocity"){
+			m_flMinImpactVelocity = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "impactangles"){
+
+			g_Utility.StringToVector( m_vecImpactAngles, szValue );
+	
+			return true;
+		}
+
+		return BaseClass.KeyValue( szKey, szValue );
+	}
+
+	void Touch( CBaseEntity@ pOther )
+	{
+		if(!pOther.IsPlayer())
+			return;
+			
+		if(!pOther.IsAlive())
+			return;
+
+		//Stand on me? ignored
+		if((pOther.pev.flags & FL_ONGROUND) == FL_ONGROUND && (pOther.pev.groundentity is self.edict() ))
+		{
+			
+		}
+		else
+		{
+			float flImpactVelocity = DotProduct(m_vecImpactDir, pOther.pev.velocity);
+			if(flImpactVelocity > m_flMinImpactVelocity)
+			{
+				if((self.pev.spawnflags & 1) == 1)
+				{
+					self.pev.takedamage = DAMAGE_NO;
+					self.pev.deadflag = DEAD_DEAD;
+					self.pev.solid = SOLID_NOT;
+					self.pev.effects |= EF_NODRAW;
+
+					ShootGibLeft(pOther.pev.origin, pOther.pev.velocity, flImpactVelocity);
+					ShootGibRight(pOther.pev.origin, pOther.pev.velocity, flImpactVelocity);
+					ShootGibTop(pOther.pev.origin, pOther.pev.velocity, flImpactVelocity);
+
+					if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
+
+						g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szHitSoundName[Math.RandomLong(0, 3)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+
+						g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+					}
+				}
+				else
+				{
+					//Only beep
+					if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
+
+						g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szBeepSoundName, 1.0, 1.0, 0, 100 );
+
+						g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+					}
+				}				
+			}
+		}
+	}
+
+	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
+	{
+		if(useType == USE_ON)
+		{
+			self.pev.spawnflags |= 1;
+		}
+		else if(useType == USE_OFF)
+		{
+			self.pev.spawnflags &= ~1;
+		}
+		else if(useType == USE_SET && flValue < 0)
+		{
+			Restart();
+		}
+	}
+
+	void ShootGibLeft(Vector origin, Vector velocity, float impactvel)
+	{
+		Vector vOrigin = (self.pev.mins + self.pev.maxs) * 0.5;
+		vOrigin.y -= 44;
+		vOrigin.z -= 18;
+
+		Vector vVelocity = velocity;
+		vVelocity.z = 64;
+		vVelocity = vVelocity.Normalize();
+		vVelocity = vVelocity * impactvel * 1.5;
+
+		CBaseEntity@ pEntity = g_EntityFuncs.Create("env_physicmodel", vOrigin, g_vecZero, true);
+
+		CEnvPhysicModel@pPhysic = cast<CEnvPhysicModel@>(CastToScriptClass(pEntity));
+
+		pEntity.pev.model = m_szGibModelLeft;
+		pEntity.pev.velocity = vVelocity;
+		pPhysic.m_vecHalfExtent = Vector(12, 38, 52);
+		pPhysic.m_flMass = 10.0;
+		
+		//LoD setup
+		pEntity.pev.iuser1 = 1;
+		pEntity.pev.iuser2 = 2;
+		pEntity.pev.iuser3 = 3;
+		pEntity.pev.fuser1 = 500;
+		pEntity.pev.fuser2 = 1000;
+		pEntity.pev.fuser3 = 2000;
+
+		//Must set spawnflags before pfnSpawn call
+		pEntity.pev.spawnflags |= SF_ENV_PHYSMODEL_BOX;
+		pEntity.pev.spawnflags |= SF_ENV_PHYSMODEL_PUSHABLE;
+
+		g_EntityFuncs.DispatchSpawn(pEntity.edict());
+	}
+
+	void ShootGibRight(Vector origin, Vector velocity, float impactvel)
+	{
+		Vector vOrigin = (self.pev.mins + self.pev.maxs) * 0.5;
+		vOrigin.y += 44;
+		vOrigin.z -= 18;
+
+		Vector vVelocity = velocity;
+		vVelocity.z = 64;
+		vVelocity = vVelocity.Normalize();
+		vVelocity = vVelocity * impactvel * 1.5;
+
+		CBaseEntity@ pEntity = g_EntityFuncs.Create("env_physicmodel", vOrigin, g_vecZero, true);
+
+		CEnvPhysicModel@pPhysic = cast<CEnvPhysicModel@>(CastToScriptClass(pEntity));
+
+		pEntity.pev.model = m_szGibModelRight;
+		pEntity.pev.velocity = vVelocity;
+		pPhysic.m_vecHalfExtent = Vector(12, 38, 52);
+		pPhysic.m_flMass = 10.0;
+
+		//LoD setup
+		pEntity.pev.iuser1 = 1;
+		pEntity.pev.iuser2 = 2;
+		pEntity.pev.iuser3 = 3;
+		pEntity.pev.fuser1 = 500;
+		pEntity.pev.fuser2 = 1000;
+		pEntity.pev.fuser3 = 2000;
+
+		//Must set spawnflags before pfnSpawn call
+		pEntity.pev.spawnflags |= SF_ENV_PHYSMODEL_BOX;
+		pEntity.pev.spawnflags |= SF_ENV_PHYSMODEL_PUSHABLE;
+
+		g_EntityFuncs.DispatchSpawn(pEntity.edict());
+	}
+
+	void ShootGibTop(Vector origin, Vector velocity, float impactvel)
+	{
+		Vector vOrigin = (self.pev.mins + self.pev.maxs) * 0.5;
+		vOrigin.z += 80;
+
+		Vector vVelocity = velocity;
+		vVelocity.z = 64;
+		vVelocity = vVelocity.Normalize();
+		vVelocity = vVelocity * impactvel * 1.5;
+
+		CBaseEntity@ pEntity = g_EntityFuncs.Create("env_physicmodel", vOrigin, g_vecZero, true);
+
+		CEnvPhysicModel@pPhysic = cast<CEnvPhysicModel@>(CastToScriptClass(pEntity));
+
+		pEntity.pev.model = m_szGibModelTop;
+		pEntity.pev.velocity = vVelocity;
+		pPhysic.m_vecHalfExtent = Vector(24, 72, 24);
+		pPhysic.m_flMass = 10.0;
+
+		//LoD setup
+		pEntity.pev.iuser1 = 1;
+		pEntity.pev.iuser2 = 2;
+		pEntity.pev.iuser3 = 3;
+		pEntity.pev.fuser1 = 500;
+		pEntity.pev.fuser2 = 1000;
+		pEntity.pev.fuser3 = 2000;
+
+		//Must set spawnflags before pfnSpawn call
+		pEntity.pev.spawnflags |= SF_ENV_PHYSMODEL_BOX;
+		pEntity.pev.spawnflags |= SF_ENV_PHYSMODEL_PUSHABLE;
+
+		g_EntityFuncs.DispatchSpawn(pEntity.edict());
+	}
+}
+
+class CFuncMatchFloor : ScriptBaseEntity
+{
+	int m_iInitialSpawnFlags = 0;
+
+	void Precache()
+	{
+		BaseClass.Precache();
+	}
+
+	void Spawn()
+	{
+		Precache();
+
+		self.pev.takedamage = DAMAGE_NO;
+		self.pev.deadflag = DEAD_NO;
+		self.pev.solid = SOLID_BSP;
+		self.pev.movetype = MOVETYPE_PUSH;
+
+		g_EntityFuncs.SetModel( self, self.pev.model );
+		g_EntityFuncs.SetSize( self.pev, self.pev.mins, self.pev.maxs );
+		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+
+		m_iInitialSpawnFlags = self.pev.spawnflags;
+		self.pev.frame = 0;
+	}
+
+	void Restart()
+	{
+		self.pev.deadflag = DEAD_NO;
+		self.pev.effects &= ~EF_NODRAW;
+		self.pev.solid = SOLID_BSP;
+		self.pev.movetype = MOVETYPE_PUSH;
+		self.pev.spawnflags = m_iInitialSpawnFlags;
+		self.pev.frame = 0;
+	}
+
+	bool KeyValue( const string & in szKey, const string & in szValue )
+	{
+		return BaseClass.KeyValue( szKey, szValue );
+	}
+
+	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
+	{
+		if(useType == USE_ON)
+		{
+			//2s icon display procedure
+			if(self.pev.health == flValue)
+				self.pev.frame = self.pev.frags;
+		}
+		else if(useType == USE_TOGGLE)
+		{
+			//Floor disappear procedure
+			if(!string(self.pev.target).IsEmpty())
+			{
+				CBaseEntity @pTarget = g_EntityFuncs.FindEntityByTargetname( null, self.pev.target );
+				if(pTarget !is null)
+				{
+					if(self.pev.frags != pTarget.pev.frags)
+					{
+						self.pev.effects |= EF_NODRAW;
+						self.pev.solid = SOLID_NOT;
+					}
+				}
+			}
+			//Show up icon
+			self.pev.frame = self.pev.frags;
+		}
+		else if(useType == USE_SET && flValue > 0)
+		{
+			if(flValue >= 100){
+				self.pev.health = flValue - 100;
+			} else {
+				self.pev.frags = flValue;
+			}
+		}
+		else if(useType == USE_SET && flValue < 0)
+		{
+			Restart();
+		}
+	}
+}
+
+class CFuncTipTile : ScriptBaseEntity
+{
+	int m_iInitialSpawnFlags = 0;
+	int m_iSpriteTexture = 0;
+	string m_szFakeTileSoundName = "fallguys/faketile.ogg";
+
+	void Precache()
+	{
+		m_iSpriteTexture = g_Game.PrecacheModel("sprites/boom.spr");
+
+		if(m_szFakeTileSoundName != ""){
+			g_SoundSystem.PrecacheSound( m_szFakeTileSoundName );
+		}
+
+		BaseClass.Precache();
+	}
+
+	void Spawn()
+	{
+		Precache();
+
+		self.pev.takedamage = DAMAGE_NO;
+		self.pev.deadflag = DEAD_NO;
+		self.pev.movetype = MOVETYPE_PUSH;
+
+		if((self.pev.spawnflags & 1) == 1)
+		{
+			self.pev.solid = SOLID_TRIGGER;
+		}
+		else
+		{
+			self.pev.solid = SOLID_BSP;
+		}
+
+		self.pev.rendermode = kRenderNormal;
+		self.pev.renderamt = 255;
+
+		g_EntityFuncs.SetModel( self, self.pev.model );
+		g_EntityFuncs.SetSize( self.pev, self.pev.mins, self.pev.maxs );
+		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+
+		self.pev.effects |= EF_FRAMEANIMTEXTURES;
+		self.pev.frame = 0;
+
+		m_iInitialSpawnFlags = self.pev.spawnflags;
+	}
+
+	void Restart()
+	{
+		self.pev.takedamage = DAMAGE_NO;
+		self.pev.deadflag = DEAD_NO;
+		self.pev.movetype = MOVETYPE_PUSH;
+		self.pev.rendermode = kRenderNormal;
+		self.pev.renderamt = 255;
+
+		if((self.pev.spawnflags & 1) == 1)
+		{
+			self.pev.solid = SOLID_TRIGGER;
+		}
+		else
+		{
+			self.pev.solid = SOLID_BSP;
+		}
+
+		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+
+		self.pev.effects |= EF_FRAMEANIMTEXTURES;
+		self.pev.frame = 0;
+
+		self.pev.spawnflags = m_iInitialSpawnFlags;
+	}
+
+	bool KeyValue( const string & in szKey, const string & in szValue )
+	{
+		return BaseClass.KeyValue( szKey, szValue );
+	}
+
+	void Touch( CBaseEntity@ pOther )
+	{
+		if(pOther.IsPlayer() && pOther.IsAlive())
+		{
+			if((self.pev.spawnflags & 1) == 1)
+			{
+				//Fake tile
+				if(self.pev.renderamt >= 240) //smoke?
+				{
+					Vector vecSmoke = self.pev.origin;
+					vecSmoke.z -= 4.0;
+
+					NetworkMessage m(MSG_PVS, NetworkMessages::SVC_TEMPENTITY, vecSmoke);
+					m.WriteByte(TE_BUBBLES);
+					m.WriteCoord(self.pev.absmin.x);
+					m.WriteCoord(self.pev.absmin.y);
+					m.WriteCoord(self.pev.absmin.z);
+					m.WriteCoord(self.pev.absmax.x);
+					m.WriteCoord(self.pev.absmax.y);
+					m.WriteCoord(self.pev.absmax.z);
+					m.WriteCoord(64.0);
+					m.WriteShort(m_iSpriteTexture);
+					m.WriteByte(32);
+					m.WriteCoord(0.125);
+					m.End();
+
+					g_SoundSystem.EmitSoundDyn( self.edict(), CHAN_STATIC, m_szFakeTileSoundName, 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+				}
+
+				self.pev.rendermode = kRenderTransTexture;
+				self.pev.renderamt = 0;
+				NextThink(self.pev.ltime + 6.0, false);
+				SetThink(ThinkFunction(this.RestoreFx));
+			}
+			else
+			{
+				//Real tile
+				self.pev.frame = 9;
+				NextThink(self.pev.ltime + 6.0, false);
+				SetThink(ThinkFunction(this.RestoreFx));
+			}
+		}
+	}
+
+	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
+	{
+		if(useType == USE_ON)
+		{
+			//Set as real
+			self.pev.spawnflags &= ~1;
+			self.pev.solid = SOLID_BSP;
+			g_EntityFuncs.SetOrigin( self, self.pev.origin );
+		}
+		else if(useType == USE_OFF)
+		{
+			//Set as fake
+			self.pev.spawnflags |= 1;
+			self.pev.solid = SOLID_TRIGGER;
+			g_EntityFuncs.SetOrigin( self, self.pev.origin );
+		}
+		else if(useType == USE_TOGGLE)
+		{
+			if((self.pev.spawnflags & 1) == 1)
+			{
+				//Set as real
+				self.pev.spawnflags &= ~1;
+				self.pev.solid = SOLID_BSP;
+				g_EntityFuncs.SetOrigin( self, self.pev.origin );
+			}
+			else
+			{
+				//Set as fake
+				self.pev.spawnflags |= 1;
+				self.pev.solid = SOLID_TRIGGER;
+				g_EntityFuncs.SetOrigin( self, self.pev.origin );
+			}
+		}
+		else if(useType == USE_SET && flValue > 0)
+		{
+			
+		}
+		else if(useType == USE_SET && flValue < 0)
+		{
+			Restart();
+		}
+	}
+
+	void NextThink(float thinkTime, const bool alwaysThink)
+	{
+		if (alwaysThink)
+			self.pev.flags |= FL_ALWAYSTHINK;
+		else
+			self.pev.flags &= ~FL_ALWAYSTHINK;
+
+		self.pev.nextthink = thinkTime;
+	}
+
+	void RestoreFx()
+	{
+		if(self.pev.renderamt < 255)
+		{
+			self.pev.renderamt = self.pev.renderamt + 1;
+			if(self.pev.renderamt > 255)
+			{
+				self.pev.renderamt = 255;
+				self.pev.rendermode = kRenderNormal;
+				SetThink(null);
+			}
+			else
+			{
+				NextThink(self.pev.ltime + 0.05, false);
+				SetThink(ThinkFunction(this.RestoreFx));
+			}
+		}
+		else if(self.pev.frame > 0)
+		{
+			self.pev.frame = self.pev.frame - 1;
+			if(self.pev.frame < 0)
+			{
+				self.pev.frame = 0;
+				SetThink(null);
+			}
+			else
+			{
+				NextThink(self.pev.ltime + 0.1, false);
+				SetThink(ThinkFunction(this.RestoreFx));
+			}
+		}
+		else
+		{
+			SetThink(null);
+		}
+	}
+}
+
 class CTriggerHUDSprite : ScriptBaseEntity
 {
 	string m_szSprName = "";
@@ -3204,7 +4190,8 @@ class CTriggerHUDSprite : ScriptBaseEntity
     		g_Game.PrecacheGeneric("sprites/" + m_szSprName );
 		}
 		if(m_szSoundName != ""){
-    		g_Game.PrecacheGeneric( "sound/" + m_szSoundName );
+    	//	g_Game.PrecacheGeneric( "sound/" + m_szSoundName );
+			g_SoundSystem.PrecacheSound( m_szSoundName );
 		}
 	}
 
@@ -3327,7 +4314,7 @@ class CTriggerHUDSprite : ScriptBaseEntity
 			}
 		}
 
-		if(m_szSoundName != "")
+		if(!m_szSoundName.IsEmpty())
 		{
 			if(useType == USE_OFF)
 			{
@@ -3338,9 +4325,12 @@ class CTriggerHUDSprite : ScriptBaseEntity
 				if(pActivator !is null && pActivator.IsPlayer() && pActivator.IsNetClient())
 				{
 					CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pActivator);
-					NetworkMessage message( MSG_ONE, NetworkMessages::SVC_STUFFTEXT, pPlayer.edict() );
-						message.WriteString("spk " + m_szSoundName+"\n");
-					message.End();
+					
+					//NetworkMessage message( MSG_ONE, NetworkMessages::SVC_STUFFTEXT, pPlayer.edict() );
+					//	message.WriteString("spk " + m_szSoundName+"\n");
+					//message.End();
+
+					g_SoundSystem.PlaySound(pPlayer.edict(), CHAN_STATIC, m_szSoundName, 1, 0.01, 0, PITCH_NORM, pPlayer.entindex());
 				}
 				else
 				{
@@ -3349,9 +4339,11 @@ class CTriggerHUDSprite : ScriptBaseEntity
 						CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
 						if(pPlayer !is null && pPlayer.IsConnected())
 						{
-							NetworkMessage message( MSG_ONE, NetworkMessages::SVC_STUFFTEXT, pPlayer.edict() );
-								message.WriteString("spk " + m_szSoundName+"\n");
-							message.End();
+							//NetworkMessage message( MSG_ONE, NetworkMessages::SVC_STUFFTEXT, pPlayer.edict() );
+							//	message.WriteString("spk " + m_szSoundName+"\n");
+							//message.End();
+
+							g_SoundSystem.PlaySound(pPlayer.edict(), CHAN_STATIC, m_szSoundName, 1, 0.01, 0, PITCH_NORM, pPlayer.entindex());
 						}
 					}
 				}
@@ -3369,6 +4361,7 @@ class CTriggerHUDCountdown : ScriptBaseEntity
 	float m_flOffsetY = 0;
 	int m_iChannel = 15;
 	RGBA m_Color = RGBA_WHITE;
+	string m_szFinalTarget = "";
 
 	void Precache()
 	{
@@ -3402,6 +4395,10 @@ class CTriggerHUDCountdown : ScriptBaseEntity
 		}
 		if(szKey == "channel"){
 		    m_iChannel = atoi(szValue);
+			return true;
+		}
+		if(szKey == "finaltarget"){
+		    m_szFinalTarget = szValue;
 			return true;
 		}
 
@@ -3457,9 +4454,20 @@ class CTriggerHUDCountdown : ScriptBaseEntity
 			m_nCurrentAccum += 1;
 			m_nCurrentCount -= 1;
 
-			if(!string(self.pev.target).IsEmpty())
+			//Fire target when count down to zero?
+			if(m_nCurrentCount == 0)
 			{
-				g_EntityFuncs.FireTargets( self.pev.target, self, self, USE_SET, float(m_nCurrentCount) );
+				if(!m_szFinalTarget.IsEmpty())
+				{
+					g_EntityFuncs.FireTargets( m_szFinalTarget, self, self, USE_TOGGLE, 0 );
+				}
+			}
+			else
+			{
+				if(!string(self.pev.target).IsEmpty())
+				{
+					g_EntityFuncs.FireTargets( self.pev.target, self, self, USE_SET, float(m_nCurrentCount) );
+				}
 			}
 
 			self.pev.nextthink = g_Engine.time + 1.0;
@@ -3506,6 +4514,16 @@ class CTriggerHUDCountdown : ScriptBaseEntity
 			m_nCurrentCount = m_nCountNum;
 			m_nCurrentAccum = 0;
 			self.pev.nextthink = 0;
+		}
+		else if(useType == USE_SET && flValue > 0)
+		{
+			//Update countdown on the fly?
+			if(int(flValue) < m_nCurrentCount)
+			{
+				m_nCurrentCount = m_nCountNum;
+				m_nCurrentAccum = 0;
+				Think();
+			}
 		}
 	}
 }
@@ -3583,7 +4601,8 @@ class CTriggerSortScore : ScriptBaseEntity
 	{
 		BaseClass.Precache();
 		
-		g_Game.PrecacheGeneric( "sound/" + m_szPitchSound );
+		//wtf why PrecacheGeneric?
+		//g_Game.PrecacheGeneric( "sound/" + m_szPitchSound );
 		g_SoundSystem.PrecacheSound( m_szPitchSound );
 	}
 
@@ -3998,7 +5017,7 @@ class CTriggerRandomCounter : ScriptBaseEntity
 			}
 
 			for (int i = int(m_szTargetArray.length()) - 1; i >= 0; i --) {
-				int randomIndex = g_PlayerFuncs.SharedRandomLong( uint(g_Engine.time) + i, 0, i );//Math.RandomLong(0, i);
+				int randomIndex = g_PlayerFuncs.SharedRandomLong( uint(g_Engine.time * 100.0) + i, 0, i );//Math.RandomLong(0, i);
 				int temp = rnd[randomIndex];
 				rnd[randomIndex] = rnd[i];
 				rnd[i] = temp;
@@ -4006,7 +5025,7 @@ class CTriggerRandomCounter : ScriptBaseEntity
 
 			for (int i = 0; i < int(m_szTargetArray.length()); i++)
 			{
-				g_EntityFuncs.FireTargets( m_szTargetArray[i], self, self, USE_SET, float(rnd[i]) );
+				g_EntityFuncs.FireTargets( m_szTargetArray[i], ((self.pev.spawnflags & 16) == 16) ? pActivator : self, self, USE_SET, float(rnd[i]) );
 				//g_Game.AlertMessage( at_console, "SetAverage %1 to %2\n", m_szTargetArray[i], float(rnd[i]) );
 			}
 		}
@@ -4014,8 +5033,8 @@ class CTriggerRandomCounter : ScriptBaseEntity
 		{
 			for (int i = 0; i < int(m_szTargetArray.length()); i++)
 			{
-				int rnd = g_PlayerFuncs.SharedRandomLong( uint(g_Engine.time) + i, m_iMinValue, m_iMaxValue );
-				g_EntityFuncs.FireTargets( m_szTargetArray[i], self, self, USE_SET, float(rnd) );
+				int rnd = g_PlayerFuncs.SharedRandomLong( uint(g_Engine.time * 100.0) + i, m_iMinValue, m_iMaxValue );
+				g_EntityFuncs.FireTargets( m_szTargetArray[i], ((self.pev.spawnflags & 16) == 16) ? pActivator : self, self, USE_SET, float(rnd) );
 				//g_Game.AlertMessage( at_console, "Set %1 to %2\n", m_szTargetArray[i], float(rnd) );
 			}
 		}
@@ -4027,6 +5046,9 @@ class CTriggerRandomMultiple : ScriptBaseEntity
 	int m_iMinCount = 0;
 	int m_iMaxCount = 1;
 	array<string> m_szTargetArray = {};
+
+	int m_iTriggerState = -1;
+	float m_flTriggerValue = 0.0;
 
 	void Precache()
 	{
@@ -4056,7 +5078,17 @@ class CTriggerRandomMultiple : ScriptBaseEntity
 			return true;
 		}
 
-		if(szKey.StartsWith("target") && szKey != "targetname"&& szKey != "target_count")
+		if(szKey == "triggerstate"){
+			m_iTriggerState = atoi(szValue);
+			return true;
+		}
+
+		if(szKey == "triggervalue"){
+			m_flTriggerValue = atof(szValue);
+			return true;
+		}
+
+		if(szKey.StartsWith("target") && szKey != "targetname" && szKey != "target_count")
 		{
 			m_szTargetArray.insertLast(szValue);
 		}
@@ -4074,18 +5106,437 @@ class CTriggerRandomMultiple : ScriptBaseEntity
 		}
 
 		for (int i = int(m_szTargetArray.length()) - 1; i >= 0; i --) {
-			int randomIndex = g_PlayerFuncs.SharedRandomLong( uint(g_Engine.time) + i, 0, i );//Math.RandomLong(0, i);
+			int randomIndex = g_PlayerFuncs.SharedRandomLong( uint(g_Engine.time * 100.0) + i, 0, i );//Math.RandomLong(0, i);
 			int temp = rnd[randomIndex];
 			rnd[randomIndex] = rnd[i];
 			rnd[i] = temp;
 		}
 
-		int count = g_PlayerFuncs.SharedRandomLong( uint(g_Engine.time), m_iMinCount, m_iMaxCount );
+		int count = g_PlayerFuncs.SharedRandomLong( uint(g_Engine.time * 100.0), m_iMinCount, m_iMaxCount );
 
 		for (int i = 0; i < count; i++)
 		{
-			g_EntityFuncs.FireTargets( m_szTargetArray[rnd[i]], self, self, useType, flValue );
-			g_Game.AlertMessage( at_console, "TriggerRandom %1\n", m_szTargetArray[rnd[i]] );
+			if(m_iTriggerState < 0)
+			{
+				g_EntityFuncs.FireTargets( m_szTargetArray[rnd[i]], ((self.pev.spawnflags & 16) == 16) ? pActivator : self, self, useType, flValue );
+			}
+			else
+			{
+				g_EntityFuncs.FireTargets( m_szTargetArray[rnd[i]], ((self.pev.spawnflags & 16) == 16) ? pActivator : self, self, USE_TYPE(m_iTriggerState), m_flTriggerValue );
+			}
+			//g_Game.AlertMessage( at_console, "TriggerRandom %1\n", m_szTargetArray[rnd[i]] );
+		}
+	}
+}
+
+class CTriggerRandomPath : ScriptBaseEntity
+{
+	int m_iColCount = 0;
+	int m_iRowCount = 0;
+	string m_szTargetNamePrefix = "";
+
+	int m_iTriggerState = -1;
+	float m_flTriggerValue = 0.0;
+
+	string m_szCellConnector = "";
+
+	void Precache()
+	{
+		BaseClass.Precache();
+	}
+
+	void Spawn()
+	{
+		Precache();
+		self.pev.solid = SOLID_NOT;
+		self.pev.movetype = MOVETYPE_NONE;
+
+		g_EntityFuncs.SetModel( self, self.pev.model );
+		g_EntityFuncs.SetSize( self.pev, self.pev.mins, self.pev.maxs );
+		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+	}
+
+	bool KeyValue( const string & in szKey, const string & in szValue )
+	{	
+		if(szKey == "colcount"){
+			m_iColCount = atoi(szValue);
+			return true;
+		}
+
+		if(szKey == "rowcount"){
+			m_iRowCount = atoi(szValue);
+			return true;
+		}
+
+		if(szKey == "targetname_prefix"){
+			m_szTargetNamePrefix = szValue;
+			return true;
+		}
+
+		if(szKey == "cellconnector"){
+			m_szCellConnector = szValue;
+			return true;
+		}
+
+		if(szKey == "triggerstate"){
+			m_iTriggerState = atoi(szValue);
+			return true;
+		}
+
+		if(szKey == "triggervalue"){
+			m_flTriggerValue = atof(szValue);
+			return true;
+		}
+
+		return BaseClass.KeyValue( szKey, szValue );
+	}
+
+	int GetCellIndex(int row, int col)
+	{
+		return row * m_iColCount + col;
+	}
+
+	int GetCellColumn(int idx)
+	{
+		return idx % m_iColCount;
+	}
+
+	int GetCellRow(int idx)
+	{
+		return idx / m_iColCount;
+	}
+
+	void FireCell(int cell, CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
+	{
+		if(m_szTargetNamePrefix.IsEmpty())
+			return;
+
+		string targetname = m_szTargetNamePrefix + cell;
+
+		//g_Game.AlertMessage( at_console, "Fire %1 \n", targetname);
+
+		if(m_iTriggerState < 0)
+		{
+			g_EntityFuncs.FireTargets( targetname, ((self.pev.spawnflags & 16) == 16) ? pActivator : self, self, useType, flValue );
+		}
+		else
+		{
+			g_EntityFuncs.FireTargets( targetname, ((self.pev.spawnflags & 16) == 16) ? pActivator : self, self, USE_TYPE(m_iTriggerState), m_flTriggerValue );
+		}
+	}
+
+	void FireConnector(int cell_1, int cell_2, CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
+	{
+		if(m_szCellConnector.IsEmpty())
+			return;
+
+		//g_Game.AlertMessage( at_console, "FireConnector %1 %2 \n", cell_1, cell_2);
+
+		string targetname_1 = m_szTargetNamePrefix + cell_1;
+
+		CBaseEntity @pCell_1 = g_EntityFuncs.FindEntityByTargetname( null, targetname_1 );
+
+		if(pCell_1 is null)
+			return;
+
+		string targetname_2 = m_szTargetNamePrefix + cell_2;
+
+		CBaseEntity @pCell_2 = g_EntityFuncs.FindEntityByTargetname( null, targetname_2 );
+
+		if(pCell_2 is null)
+			return;
+
+		CBaseEntity @pConnector = g_EntityFuncs.FindEntityByTargetname( null, m_szCellConnector );
+
+		if(pConnector is null)
+			return;
+
+		pConnector.pev.origin = (pCell_1.pev.origin + pCell_2.pev.origin) * 0.5;
+		pConnector.Use(((self.pev.spawnflags & 16) == 16) ? pActivator : self, self, USE_TYPE(m_iTriggerState), m_flTriggerValue);
+	}
+
+	void FireQuadConnector(int cell_1, int cell_2, int cell_3, int cell_4, CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
+	{
+		if(m_szCellConnector.IsEmpty())
+			return;
+
+		//g_Game.AlertMessage( at_console, "FireQuadConnector %1 %2 %3 %4 \n", cell_1, cell_2, cell_3, cell_4);
+
+		string targetname_1 = m_szTargetNamePrefix + cell_1;
+
+		CBaseEntity @pCell_1 = g_EntityFuncs.FindEntityByTargetname( null, targetname_1 );
+
+		if(pCell_1 is null)
+			return;
+
+		string targetname_2 = m_szTargetNamePrefix + cell_2;
+
+		CBaseEntity @pCell_2 = g_EntityFuncs.FindEntityByTargetname( null, targetname_2 );
+
+		if(pCell_2 is null)
+			return;
+
+		string targetname_3 = m_szTargetNamePrefix + cell_3;
+
+		CBaseEntity @pCell_3 = g_EntityFuncs.FindEntityByTargetname( null, targetname_3 );
+
+		if(pCell_3 is null)
+			return;
+
+		string targetname_4 = m_szTargetNamePrefix + cell_4;
+
+		CBaseEntity @pCell_4 = g_EntityFuncs.FindEntityByTargetname( null, targetname_4 );
+
+		if(pCell_4 is null)
+			return;
+
+		CBaseEntity @pConnector = g_EntityFuncs.FindEntityByTargetname( null, m_szCellConnector );
+
+		if(pConnector is null)
+			return;
+
+		pConnector.pev.origin = (pCell_1.pev.origin + pCell_2.pev.origin + pCell_3.pev.origin + pCell_4.pev.origin) * 0.25;
+		pConnector.Use(((self.pev.spawnflags & 16) == 16) ? pActivator : self, self, USE_TYPE(m_iTriggerState), m_flTriggerValue);
+	}
+
+	array<int> GetReachableCell(array<int>@ matrix, int currentCell)
+	{
+		array<int> reachable = {};
+
+		int row = GetCellRow(currentCell);
+		int col = GetCellColumn(currentCell);
+		if(col == 0)
+		{
+			if(row == m_iRowCount - 1){
+				if(matrix[GetCellIndex(row, col + 1)] == 0)
+					reachable.insertLast(GetCellIndex(row, col + 1));
+				return reachable;
+			}
+
+			if(matrix[GetCellIndex(row + 1, col)] == 0)
+				reachable.insertLast(GetCellIndex(row + 1, col));
+
+			if(matrix[GetCellIndex(row, col + 1)] == 0)
+				reachable.insertLast(GetCellIndex(row, col + 1));
+
+			return reachable;
+		}
+		else if(col == m_iColCount - 1)
+		{
+			if(row == m_iRowCount - 1){
+				if(matrix[GetCellIndex(row, col - 1)] == 0)
+					reachable.insertLast(GetCellIndex(row, col - 1));
+				return reachable;
+			}
+
+			if(matrix[GetCellIndex(row + 1, col)] == 0)	
+				reachable.insertLast(GetCellIndex(row + 1, col));
+			
+			if(matrix[GetCellIndex(row, col - 1)] == 0)	
+				reachable.insertLast(GetCellIndex(row, col - 1));
+			
+			return reachable;
+		}
+
+		if(row == m_iRowCount - 1){
+			if(matrix[GetCellIndex(row, col - 1)] == 0)	
+				reachable.insertLast(GetCellIndex(row, col - 1));
+
+			if(matrix[GetCellIndex(row, col + 1)] == 0)	
+				reachable.insertLast(GetCellIndex(row, col + 1));
+		
+			return reachable;
+		}
+
+		if(matrix[GetCellIndex(row + 1, col)] == 0)	
+			reachable.insertLast(GetCellIndex(row + 1, col));
+
+		if(matrix[GetCellIndex(row, col - 1)] == 0)	
+			reachable.insertLast(GetCellIndex(row, col - 1));
+		
+		if(matrix[GetCellIndex(row, col + 1)] == 0)	
+			reachable.insertLast(GetCellIndex(row, col + 1));
+
+		return reachable;
+	}
+
+	array<int> GetLinkableCell(array<int>@ matrix, int currentCell)
+	{
+		array<int> linkable = {};
+
+		int row = GetCellRow(currentCell);
+		int col = GetCellColumn(currentCell);
+		if(col == 0)
+		{
+			if(row == m_iRowCount - 1){
+
+				if(matrix[GetCellIndex(row, col + 1)] == 1)
+					linkable.insertLast(GetCellIndex(row, col + 1));
+
+				if(row > 0 && matrix[GetCellIndex(row - 1, col)] == 1)
+					linkable.insertLast(GetCellIndex(row - 1, col));
+
+				return linkable;
+			}
+
+			if(matrix[GetCellIndex(row + 1, col)] == 1)
+				linkable.insertLast(GetCellIndex(row + 1, col));
+
+			if(matrix[GetCellIndex(row, col + 1)] == 1)
+				linkable.insertLast(GetCellIndex(row, col + 1));
+
+			if(row > 0 && matrix[GetCellIndex(row - 1, col)] == 1)
+				linkable.insertLast(GetCellIndex(row - 1, col));
+
+			return linkable;
+		}
+		else if(col == m_iColCount - 1)
+		{
+			if(row == m_iRowCount - 1){
+
+				if(col > 0 && matrix[GetCellIndex(row, col - 1)] == 1)
+					linkable.insertLast(GetCellIndex(row, col - 1));
+
+				if(row > 0 && matrix[GetCellIndex(row - 1, col - 1)] == 1)
+					linkable.insertLast(GetCellIndex(row - 1, col - 1));
+
+				return linkable;
+			}
+
+			if(matrix[GetCellIndex(row + 1, col)] == 1)	
+				linkable.insertLast(GetCellIndex(row + 1, col));
+			
+			if(col > 0 && matrix[GetCellIndex(row, col - 1)] == 1)	
+				linkable.insertLast(GetCellIndex(row, col - 1));
+			
+			if(row > 0 && matrix[GetCellIndex(row - 1, col)] == 1)	
+				linkable.insertLast(GetCellIndex(row - 1, col));
+			
+			return linkable;
+		}
+
+		if(row == m_iRowCount - 1){
+
+			if(col > 0 && matrix[GetCellIndex(row, col - 1)] == 1)	
+				linkable.insertLast(GetCellIndex(row, col - 1));
+
+			if(matrix[GetCellIndex(row, col + 1)] == 1)	
+				linkable.insertLast(GetCellIndex(row, col + 1));
+		
+			if(row > 0 && matrix[GetCellIndex(row - 1, col)] == 1)	
+				linkable.insertLast(GetCellIndex(row - 1, col));
+		
+			return linkable;
+		}
+
+		if(matrix[GetCellIndex(row + 1, col)] == 1)	
+			linkable.insertLast(GetCellIndex(row + 1, col));
+
+		if(col > 0 && matrix[GetCellIndex(row, col - 1)] == 1)	
+			linkable.insertLast(GetCellIndex(row, col - 1));
+		
+		if(matrix[GetCellIndex(row, col + 1)] == 1)	
+			linkable.insertLast(GetCellIndex(row, col + 1));
+
+		if(row > 0 && matrix[GetCellIndex(row - 1, col)] == 1)	
+			linkable.insertLast(GetCellIndex(row - 1, col));
+
+		return linkable;
+	}
+
+	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
+	{
+		if(useType == USE_TOGGLE)
+		{
+			uint seed = uint(g_Engine.time * 100.0);
+
+			array<int> matrix(m_iRowCount * m_iColCount);
+			array<int> links;
+			array<int> undirected_links;
+
+			for(int i = 0;i < int(matrix.length()); ++i)
+			{
+				matrix[i] = 0;
+			}
+
+			int currentCell = GetCellIndex(0, g_PlayerFuncs.SharedRandomLong(seed, 0, m_iColCount - 1 ));
+
+			int loopCount = 0;
+
+			while(loopCount < m_iRowCount * m_iColCount)
+			{
+				matrix[currentCell] = 1;
+
+				if(GetCellRow(currentCell) == m_iRowCount - 1)
+				{
+					break;
+				}
+
+				array<int> reachable = GetReachableCell(matrix, currentCell);
+
+				if(reachable.length() > 0)
+				{
+					currentCell = reachable[g_PlayerFuncs.SharedRandomLong(seed + loopCount , 0, reachable.length() - 1 )];
+				}
+				else
+				{
+					break;
+				}
+
+				loopCount ++;
+			}
+
+			for(int cell = 0;cell < int(matrix.length()); ++cell)
+			{
+				if(matrix[cell] == 1)
+				{
+					FireCell(cell, pActivator, pCaller, useType, flValue);
+
+					array<int> linkable = GetLinkableCell(matrix, cell);
+					for(int j = 0; j < int(linkable.length()); ++j){
+						int packedCells = (cell & 0xFFFF)  | ((linkable[j] & 0xFFFF) << 16);
+						int packedCellsR = (linkable[j] & 0xFFFF) | ((cell & 0xFFFF) << 16);
+
+						if(undirected_links.find(packedCells) < 0 && undirected_links.find(packedCellsR) < 0)
+						{
+							links.insertLast(packedCells);
+						}
+						undirected_links.insertLast(packedCells);
+						undirected_links.insertLast(packedCellsR);
+					}
+				}
+			}
+
+			for(int linkIdx = 0;linkIdx < int(links.length()); ++linkIdx)
+			{
+				int packedCells = links[linkIdx];
+				int cell_1 = (packedCells & 0xFFFF);
+				int cell_2 = ((packedCells >> 16) & 0xFFFF);
+				FireConnector(cell_1, cell_2, pActivator, pCaller, useType, flValue);
+			}
+
+			for(int cell = 0;cell < int(matrix.length()); ++cell)
+			{
+				int row = GetCellRow(cell);
+				int col = GetCellColumn(cell);
+				if(matrix[cell] == 1)
+				{
+					if( row + 1 < m_iRowCount && matrix[GetCellIndex(row + 1, col)] == 1)
+					{
+						if( col + 1 < m_iColCount && matrix[GetCellIndex(row, col + 1)] == 1)
+						{
+							if( row + 1 < m_iRowCount && col + 1 < m_iColCount && matrix[GetCellIndex(row + 1, col + 1)] == 1)
+							{
+								FireQuadConnector(cell,
+								 GetCellIndex(row + 1, col), 
+								 GetCellIndex(row, col + 1), 
+								 GetCellIndex(row + 1, col + 1),
+								pActivator, pCaller, useType, flValue );
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 }
@@ -4143,7 +5594,7 @@ class CTriggerEntityItor2 : ScriptBaseEntity
 		}
 	
 		if(szKey == "triggervalue"){
-			m_flTriggerValue = atoi(szValue);
+			m_flTriggerValue = atof(szValue);
 			return true;
 		}
 		return BaseClass.KeyValue( szKey, szValue );
@@ -4257,7 +5708,11 @@ class CTriggerEntityItor3 : ScriptBaseEntity
 				else if(m_iStatusFilter == 2 && pEntity.pev.deadflag == DEAD_NO)
 					continue;
 
-				pEntity.Use( pActivator, self, USE_TYPE(m_iTriggerState), m_flTriggerValue );
+				if(m_iTriggerState == -1){
+					pEntity.SUB_Remove();
+				} else {
+					pEntity.Use( pActivator, self, USE_TYPE(m_iTriggerState), m_flTriggerValue );
+				}
 			}
 			else if( !m_szNameFilter.IsEmpty() && string(pEntity.pev.targetname) == m_szNameFilter){
 
@@ -4266,7 +5721,11 @@ class CTriggerEntityItor3 : ScriptBaseEntity
 				else if(m_iStatusFilter == 2 && pEntity.pev.deadflag == DEAD_NO)
 					continue;
 
-				pEntity.Use( pActivator, self, USE_TYPE(m_iTriggerState), m_flTriggerValue );
+				if(m_iTriggerState == -1){
+					pEntity.SUB_Remove();
+				} else {
+					pEntity.Use( pActivator, self, USE_TYPE(m_iTriggerState), m_flTriggerValue );
+				}
 			}
 			else if(m_szNameStartWith.IsEmpty() && m_szNameFilter.IsEmpty())
 			{
@@ -4275,7 +5734,11 @@ class CTriggerEntityItor3 : ScriptBaseEntity
 				else if(m_iStatusFilter == 2 && pEntity.pev.deadflag == DEAD_NO)
 					continue;
 
-				pEntity.Use( pActivator, self, USE_TYPE(m_iTriggerState), m_flTriggerValue );
+				if(m_iTriggerState == -1){
+					pEntity.SUB_Remove();
+				} else {
+					pEntity.Use( pActivator, self, USE_TYPE(m_iTriggerState), m_flTriggerValue );
+				}
 			}
 		}
 	}
@@ -4625,6 +6088,114 @@ class CTriggerToggleBSP : ScriptBaseEntity
 		}
 	}
 }
+class CTriggerCreateEnts : ScriptBaseEntity
+{
+	string m_iszCrtEntChildName;
+	string m_iszCrtEntChildClass;
+
+	Vector m_RowOffset = g_vecZero;
+	int m_iRowCount = 0;
+
+	Vector m_ColOffset = g_vecZero;
+	int m_iColumnCount = 0;
+
+	dictionary m_KeyValues;
+
+	void Precache()
+	{
+		BaseClass.Precache();
+	}
+
+	void Spawn()
+	{
+		Precache();
+		self.pev.solid = SOLID_NOT;
+		self.pev.movetype = MOVETYPE_NONE;
+
+		g_EntityFuncs.SetModel( self, self.pev.model );
+		g_EntityFuncs.SetSize( self.pev, self.pev.mins, self.pev.maxs );
+		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+	}
+
+	bool KeyValue( const string & in szKey, const string & in szValue )
+	{
+		if(szKey == "rowcount"){
+			m_iRowCount = atoi(szValue);
+			return true;
+		}
+
+		if(szKey == "colcount"){
+			m_iColumnCount = atoi(szValue);
+			return true;
+		}
+		
+		if(szKey == "rowoffset"){
+			g_Utility.StringToVector( m_RowOffset, szValue );
+			return true;
+		}
+
+		if(szKey == "coloffset"){
+			g_Utility.StringToVector( m_ColOffset, szValue );
+			return true;
+		}
+
+		if(szKey == "m_iszCrtEntChildClass"){
+			m_iszCrtEntChildClass = szValue;
+			return true;
+		}
+		
+		if(szKey == "m_iszCrtEntChildName"){
+			m_iszCrtEntChildName = szValue;
+			return true;
+		}
+
+		if(szKey.StartsWith("-")){
+			m_KeyValues[szKey.SubString(1)] = szValue;
+			return true;
+		}
+
+		return BaseClass.KeyValue( szKey, szValue );
+	}
+
+	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
+	{
+		if(useType == USE_TOGGLE)
+		{
+			//Create ents as usual
+
+			if(m_iszCrtEntChildClass.IsEmpty())
+				return;
+
+			if(string(self.pev.target).IsEmpty())
+				return;
+
+			CBaseEntity @pTarget = g_EntityFuncs.FindEntityByTargetname( null, self.pev.target );
+
+			if(pTarget is null)
+				return;
+
+			for(int i = 0;i < m_iRowCount; ++i)
+			{
+				for(int j = 0;j < m_iColumnCount; ++j)
+				{
+					Vector vecOrigin = self.pev.origin;
+					vecOrigin = vecOrigin + m_RowOffset * float(i);
+					vecOrigin = vecOrigin + m_ColOffset * float(j);
+
+					CBaseEntity@ pEntity = g_EntityFuncs.CreateEntity(m_iszCrtEntChildClass, m_KeyValues, false);
+					pEntity.pev.angles = g_vecZero;
+					pEntity.pev.origin = vecOrigin;
+					pEntity.pev.model = pTarget.pev.model;
+
+					int cell = (j + i * m_iColumnCount);
+					pEntity.pev.targetname = m_iszCrtEntChildName + cell;
+
+					g_EntityFuncs.DispatchSpawn(pEntity.edict());
+				}
+			}
+		}
+	}
+}
 
 class CTriggerSortPanel : ScriptBaseEntity
 {
@@ -4686,11 +6257,30 @@ class CTriggerSortPanel : ScriptBaseEntity
 
 		if(arrayPanelEntities.length() > 0)
 		{
+			//Shuffule
+			array<int> rnd( arrayPanelEntities.length() );
+
+			for (int i = 0; i < int(arrayPanelEntities.length()); i++)
+			{
+				rnd[i] = i;
+			}
+
+			if((self.pev.spawnflags & 1) == 1)
+			{
+				for (int i = int(arrayPanelEntities.length()) - 1; i >= 0; i --)
+				{
+					int randomIndex = g_PlayerFuncs.SharedRandomLong( uint(g_Engine.time * 100.0) + i, 0, i );//Math.RandomLong(0, i);
+					int temp = rnd[randomIndex];
+					rnd[randomIndex] = rnd[i];
+					rnd[i] = temp;
+				}
+			}
+
 			float yaw = 360.0 / float(arrayPanelEntities.length());
 
 			for (int i = 0; i < int(arrayPanelEntities.length()); i++)
 			{
-				arrayPanelEntities[i].pev.angles = Vector(0, yaw * i, 0);
+				arrayPanelEntities[i].pev.angles = Vector(0, yaw * rnd[i], 0);
 				g_EntityFuncs.SetOrigin( arrayPanelEntities[i], arrayPanelEntities[i].pev.origin );
 			}
 		}
@@ -5184,7 +6774,7 @@ class CMonsterRhino : ScriptBaseMonsterEntity
 		Vector vecSmoke = self.pev.origin;// + g_Engine.v_forward * (-100);
 		vecSmoke.z += 5;
 
-		NetworkMessage m(MSG_PAS, NetworkMessages::SVC_TEMPENTITY, vecSmoke);
+		NetworkMessage m(MSG_PVS, NetworkMessages::SVC_TEMPENTITY, vecSmoke);
 		m.WriteByte(TE_EXPLOSION);
 		m.WriteCoord(vecSmoke.x);
 		m.WriteCoord(vecSmoke.y);
@@ -5207,7 +6797,7 @@ class CMonsterRhino : ScriptBaseMonsterEntity
 		Vector vecSmoke = self.pev.origin + g_Engine.v_forward * (-100);
 		vecSmoke.z += 40;
 
-		NetworkMessage m(MSG_PAS, NetworkMessages::SVC_TEMPENTITY, vecSmoke);
+		NetworkMessage m(MSG_PVS, NetworkMessages::SVC_TEMPENTITY, vecSmoke);
 		m.WriteByte(TE_EXPLOSION);
 		m.WriteCoord(vecSmoke.x);
 		m.WriteCoord(vecSmoke.y);
@@ -5249,6 +6839,7 @@ class CMonsterRhino : ScriptBaseMonsterEntity
 		self.pev.velocity = m_vecDashDir * 800;
 	}
 
+	//Not PM code, velocity works
 	void DashTouch(CBaseEntity @pOther)
 	{
 		if(pOther is null)
@@ -5281,7 +6872,6 @@ class CMonsterRhino : ScriptBaseMonsterEntity
 			pOther.pev.velocity = PushVelocity * flCosAngle;
 		}
 	}
-
 
 	void StartTask ( Task@ pTask )
 	{
@@ -5427,9 +7017,44 @@ class CMonsterRhino : ScriptBaseMonsterEntity
 	}
 }
 
+HookReturnCode PlayerTouchImpact( CBasePlayer@ pPlayer, CBaseEntity@ pOther )
+{
+	//g_Game.AlertMessage( at_console, "PlayerTouchImpact %1 touches %2 with impact velocity %3", string(pPlayer.pev.netname), string(pOther.pev.targetname), pPlayer.pev.velocity.Length() );
+
+	if(pOther.IsPlayer() && pOther.IsAlive())
+	{
+		Vector vDiff = pOther.pev.origin - pPlayer.pev.origin;
+		vDiff = vDiff.Normalize();
+
+		Vector vecImpactVelocity = pPlayer.pev.velocity;
+
+		float flImpactVelocity = vecImpactVelocity.Length();
+
+		vecImpactVelocity = vecImpactVelocity.Normalize();
+
+		float flCosAngle = DotProduct(vDiff, vecImpactVelocity);
+
+		if(flCosAngle > c_PlayerImpactPlayer_MinimumCosAngle && flImpactVelocity > c_PlayerImpactPlayer_MinimumImpactVelocity)
+		{
+			g_ArrayBounceVelocityPlayer[pOther.entindex()] = vDiff * flImpactVelocity * flCosAngle * c_PlayerImpactPlayer_VelocityTransferEfficiency;
+
+			if(g_Engine.time > g_ArrayBouncePlayer[pOther.entindex()]){
+
+				//g_SoundSystem.EmitSoundDyn( pOther.edict(), CHAN_STATIC, m_szBounceSoundName[Math.RandomLong(0, 2)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+				
+				pOther.TakeDamage( pPlayer.pev, pPlayer.pev, 1, DMG_SLASH );
+
+				g_ArrayBouncePlayer[pOther.entindex()] = g_Engine.time + 0.5;
+			}
+		}
+	}
+
+    return HOOK_CONTINUE;
+}
+
 HookReturnCode PlayerAddToFullPack( entity_state_t@ state, int e, edict_t @ent, edict_t@ host, int hostflags, int player, uint& out uiFlags )
 {
-	if(ent.vars.iuser4 == g_iLodStudioModelMagicNumber)
+	/*if(ent.vars.iuser4 == g_iLodStudioModelMagicNumber)
 	{
 		if(ent.vars.fuser1 > 0 && ent.vars.fuser2 > 0 && ent.vars.fuser3 > 0)
 		{
@@ -5447,7 +7072,7 @@ HookReturnCode PlayerAddToFullPack( entity_state_t@ state, int e, edict_t @ent, 
 				state.body = ent.vars.iuser1;
 			}
 		}
-	}
+	}*/
 
 	//Arrow Sprite
 	if(ent.vars.iuser4 == g_iPlayerArrowSpriteMagicNumber)
@@ -5510,19 +7135,11 @@ HookReturnCode PlayerAddToFullPack( entity_state_t@ state, int e, edict_t @ent, 
     return HOOK_HANDLED;
 }
 
-HookReturnCode PlayerKilled( CBasePlayer@ pPlayer, CBaseEntity@ pAttacker, int iGib )
+HookReturnCode ClientDisconnect(CBasePlayer@ pPlayer)
 {
-    if(pPlayer is null)
-        return HOOK_HANDLED;
-    if(!pPlayer.IsNetClient())
-        return HOOK_HANDLED;
+	PlayerHideArrow(pPlayer);
 
-	//pPlayer.GetObserver().StartObserver( pPlayer.pev.origin, pPlayer.pev.angles, false );
-	//pPlayer.GetObserver().SetMode(OBS_ROAMING);
-	//pPlayer.GetObserver().SetObserverModeControlEnabled(true);
-	//pPlayer.SetMaxSpeedOverride( -1 );
-
-    return HOOK_HANDLED;
+    return HOOK_CONTINUE;
 }
 
 HookReturnCode PlayerSpawn(CBasePlayer@ pPlayer)
@@ -5555,6 +7172,8 @@ HookReturnCode PlayerTakeDamage(DamageInfo@ info)
 
 void PlayerJump(CBasePlayer@ pPlayer)
 {
+	int playerindex = pPlayer.entindex();
+
 	if ((pPlayer.pev.flags & FL_WATERJUMP) == FL_WATERJUMP)
 		return;
 
@@ -5564,41 +7183,71 @@ void PlayerJump(CBasePlayer@ pPlayer)
 	if ((pPlayer.pev.flags & FL_ONGROUND) == 0)
 		return;
 
-	g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_VOICE, g_szPlayerJumpSound[Math.RandomLong(0, 7)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+	g_ArrayPlayerJumpState[playerindex] = 1;
+
+	if(pPlayer.pev.groundentity !is null)
+	{
+		g_ArrayPlayerJumpPreGroundEntity[playerindex] = g_EngineFuncs.IndexOfEdict(pPlayer.pev.groundentity);
+	}
+	else
+	{
+		g_ArrayPlayerJumpPreGroundEntity[playerindex] = 0;
+	}
+}
+
+void PlayerJumped(CBasePlayer@ pPlayer)
+{
+	int playerindex = pPlayer.entindex();
+
+	if(g_ArrayPlayerJumpState[playerindex] != 1)
+		return;
+
+	if(g_Engine.time > g_ArrayJumpPlayer[playerindex]){
+
+		g_ArrayPlayerJumpState[playerindex] = 2;
+
+		g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_VOICE, g_szPlayerJumpSound[Math.RandomLong(0, 7)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
+	
+		g_ArrayJumpPlayer[playerindex] = g_Engine.time + 0.5;
+	}
 }
 
 void PlayerFalling(CBasePlayer@ pPlayer)
 {
-	if(g_ArrayFallingPlayer[pPlayer.entindex()] == false){
+	int playerindex = pPlayer.entindex();
+	if(g_ArrayFallingPlayer[playerindex] == false){
 
 		string szSoundName = g_szPlayerFallingSound[Math.RandomLong(0, 1)];
 
 		g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_VOICE, szSoundName, 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
 
-		g_ArrayFallingPlayer[pPlayer.entindex()] = true;
-		g_ArrayFallingPlayerPlayingSound[pPlayer.entindex()] = szSoundName;
+		g_ArrayFallingPlayer[playerindex] = true;
+		g_ArrayFallingPlayerPlayingSound[playerindex] = szSoundName;
 	}
 }
 
 void PlayerStopFall(CBasePlayer@ pPlayer)
 {
-	if(g_ArrayFallingPlayer[pPlayer.entindex()] == true){
+	int playerindex = pPlayer.entindex();
+	if(g_ArrayFallingPlayer[playerindex] == true){
 
-		g_SoundSystem.StopSound( pPlayer.edict(), CHAN_VOICE, g_ArrayFallingPlayerPlayingSound[pPlayer.entindex()] );
+		g_SoundSystem.StopSound( pPlayer.edict(), CHAN_VOICE, g_ArrayFallingPlayerPlayingSound[playerindex] );
 
-		g_ArrayFallingPlayer[pPlayer.entindex()] = false;
+		g_ArrayFallingPlayer[playerindex] = false;
 	}
 }
 
 void PlayerStopBlock(CBasePlayer@ pPlayer)
 {
-	g_ArrayBlockPlayer[pPlayer.entindex()].IsBlocking = false;
+	int playerindex = pPlayer.entindex();
+	g_ArrayBlockPlayer[playerindex].IsBlocking = false;
 
-	if(g_ArrayBlockPlayer[pPlayer.entindex()].flLastSoundTime > 0 && 
-		!g_ArrayBlockPlayer[pPlayer.entindex()].szPlayingSound.IsEmpty())
+	if(g_ArrayBlockPlayer[playerindex].flLastSoundTime > 0 && 
+		!g_ArrayBlockPlayer[playerindex].szPlayingSound.IsEmpty())
 	{
-		g_SoundSystem.StopSound( pPlayer.edict(), CHAN_BODY, g_ArrayBlockPlayer[pPlayer.entindex()].szPlayingSound );
-		g_ArrayBlockPlayer[pPlayer.entindex()].flLastSoundTime = 0;
+		g_SoundSystem.StopSound( pPlayer.edict(), CHAN_BODY, g_ArrayBlockPlayer[playerindex].szPlayingSound );
+
+		g_ArrayBlockPlayer[playerindex].flLastSoundTime = 0;
 	}
 }
 
@@ -5617,8 +7266,18 @@ void PlayerShowArrow(CBasePlayer@ pPlayer)
 	@pEntity.pev.aiment = pPlayer.edict();
 	pEntity.pev.movetype = MOVETYPE_FOLLOW;
 	pEntity.pev.rendermode = kRenderNormal;
-	pEntity.pev.iuser4 = g_iPlayerArrowSpriteMagicNumber;
-	pEntity.pev.iuser1 = pPlayer.entindex();
+
+	g_EntityFuncs.SetEntityPartialViewer(pEntity.edict(), (1 << (pPlayer.entindex() - 1)) );
+	g_EntityFuncs.SetEntityLevelOfDetail(pEntity.edict(),
+		LOD_MODELINDEX | LOD_SCALE_INTERP, //modelindex LoD
+		g_iPlayerArrowSpriteModelIndex, 0.15,      //LoD 0
+		g_iPlayerArrowSpriteModelIndex, 0.15, 300, //Lod 1
+		g_iPlayerArrowSprite2ModelIndex, 0.75, 700, //Lod 2
+		g_iPlayerArrowSprite2ModelIndex, 0.75, 1000 //Lod 3
+	);
+
+	//pEntity.pev.iuser4 = g_iPlayerArrowSpriteMagicNumber;
+	//pEntity.pev.iuser1 = pPlayer.entindex();
 
 	g_ArrayArrowEntityPlayer[pPlayer.entindex()] = EHandle(@pEntity);
 }
@@ -5640,6 +7299,8 @@ HookReturnCode PlayerPreThink(CBasePlayer@ pPlayer, uint& out uiFlags)
 
 	int playerIndex = pPlayer.entindex();
 
+	g_ArrayPlayerJumpState[playerIndex] = 0;
+
 	if(pPlayer.IsAlive())
 	{
 		if((pPlayer.pev.button & IN_JUMP) == IN_JUMP && (pPlayer.pev.oldbuttons & IN_JUMP) == 0)
@@ -5654,6 +7315,9 @@ HookReturnCode PlayerPreThink(CBasePlayer@ pPlayer, uint& out uiFlags)
 		}
 	}
 
+	//Real velocity, Used in pfnTouch
+	g_ArrayVelocityPlayer[playerIndex] = pPlayer.pev.velocity;
+
 	return HOOK_CONTINUE;
 }
 
@@ -5663,6 +7327,9 @@ HookReturnCode PlayerPostThink(CBasePlayer@ pPlayer)
 		return HOOK_CONTINUE;
 
 	int playerIndex = pPlayer.entindex();
+
+	//Real velocity, Used in pfnTouch
+	g_ArrayVelocityPlayer[playerIndex] = pPlayer.pev.velocity;
 
 	if(g_ArrayBlockPlayer[playerIndex].IsBlocking &&
 		g_Engine.time > g_ArrayBlockPlayer[playerIndex].flLastBlockTime + 0.1)
@@ -5683,10 +7350,10 @@ HookReturnCode PlayerPostThink(CBasePlayer@ pPlayer)
 	{
 		pPlayer.m_iWeaponVolume = LOUD_GUN_VOLUME;
 
-
-
 		if((pPlayer.pev.flags & FL_ONGROUND) == 0)
 		{
+			PlayerJumped(pPlayer);
+
 			if(pPlayer.pev.velocity.z < -400.0)
 			{
 				PlayerFalling(pPlayer);
@@ -5764,7 +7431,7 @@ bool PlayerGrab( CBaseEntity@ pPlayer)
 
 			Vector vDiff = vecTarget - pHitEnt.pev.origin;
 
-			Vector vel = vDiff.Normalize() * 1500.0 * g_Engine.frametime;
+			Vector vel = vDiff.Normalize() * 2500.0 * g_Engine.frametime;
 
 			if(vel.z > 0.0)
 				vel.z = 0.0;
@@ -5810,7 +7477,7 @@ HookReturnCode PlayerUse(CBasePlayer@ pPlayer, uint& out uiFlags)
 
 const bool doCommand(CBasePlayer@ plr, const CCommand@ args, bool inConsole) {
 
-  if (args.ArgC() >= 2 && (args[0] == ".fgtest" || args[0] == "fgtest")) {
+  if (args.ArgC() >= 2 && args[0] == ".fgtest") {
 
 		CBaseEntity@ pEntity = null;
 		while((@pEntity = g_EntityFuncs.FindEntityByClassname(pEntity, "env_studiomodel")) !is null)
@@ -5821,9 +7488,39 @@ const bool doCommand(CBasePlayer@ plr, const CCommand@ args, bool inConsole) {
 		}
 		return true;
   }
-  else if (args.ArgC() == 1) {
+  else if (args.ArgC() == 1 && args[0] == ".fgtest") {
 
-		plr.pev.origin = Vector(-1978, -3072, 1366);
+		//plr.pev.origin = Vector(-6180, -6918, 1040);
+		//plr.pev.origin = Vector(-1608, -6604, 1068);
+		plr.pev.origin = Vector(-13397, 2938, 850);
+		return true;
+  }
+  else if (args.ArgC() == 1 && args[0] == ".fgtest2") {
+
+		Vector vOrigin = plr.pev.origin;
+
+		Vector vVelocity = GetAimDir(plr);
+		
+		vVelocity.x *= 500;
+		vVelocity.y *= 500;
+		vVelocity.z *= 500;
+
+		string m_szGibModelLeft = "models/fallguys/door4.mdl";
+
+		CBaseEntity@ pEntity = g_EntityFuncs.Create("env_physicmodel", vOrigin, g_vecZero, true);
+		
+		CEnvPhysicModel@pPhysic = cast<CEnvPhysicModel@>(CastToScriptClass(pEntity));
+
+		pEntity.pev.model = m_szGibModelLeft;
+		pEntity.pev.velocity = vVelocity;
+		pPhysic.m_vecHalfExtent = Vector(12, 38, 52);
+		pPhysic.m_flMass = 10.0;
+		
+		//Must set spawnflags before pfnSpawn call
+		pEntity.pev.spawnflags |= SF_ENV_PHYSMODEL_BOX;
+		pEntity.pev.spawnflags |= SF_ENV_PHYSMODEL_PUSHABLE;
+
+		g_EntityFuncs.DispatchSpawn(pEntity.edict());
 
 		return true;
   }
@@ -5836,11 +7533,17 @@ void consoleCmd(const CCommand@ args) {
 }
 
 CClientCommand _test("fgtest", "fgtest commands", @consoleCmd);
+CClientCommand _test2("fgtest2", "fgtest2 commands", @consoleCmd);
 
 void MapInit()
 {
+	string m_szGibModelLeft = "models/fallguys/door4.mdl";
+	g_Game.PrecacheModel( m_szGibModelLeft );
+
 	//Point entity
+	g_CustomEntityFuncs.RegisterCustomEntity( "CEnvPhysicModel", "env_physicmodel" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CEnvStudioModel", "env_studiomodel" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "CEnvSkinButton", "env_skinbutton" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerHUDSprite", "trigger_hudsprite" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerHUDCountdown", "trigger_hudcountdown" );	
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerRespawnUnstuck", "trigger_respawn_unstuck" );
@@ -5849,12 +7552,14 @@ void MapInit()
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerSortScore", "trigger_sort_score" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerRandomCounter", "trigger_random_counter" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerRandomMultiple", "trigger_random_multiple" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerRandomPath", "trigger_random_path" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerEntityItor2", "trigger_entity_itor2" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerEntityItor3", "trigger_entity_itor3" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerRelay2", "trigger_relay2" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CGamePlayerCounter2", "game_player_counter2" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerSortPanel", "trigger_sort_panel" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerToggleBSP", "trigger_toggle_bsp" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerCreateEnts", "trigger_create_ents" );
 	
 	//Solid entity
 	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncRotatingFg", "func_rotating_fg" );
@@ -5865,14 +7570,15 @@ void MapInit()
 	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncBouncer", "func_bouncer" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncBounceDrum", "func_bouncedrum" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncPendulum2", "func_pendulum2" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncBreakDoor", "func_breakdoor" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncMatchFloor", "func_matchfloor" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncTipTile", "func_tiptile" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerFreeze", "trigger_freeze" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerFindBrush", "trigger_findbrush" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CMonsterRhino", "monster_rhino" );
 
 	g_iPlayerArrowSpriteModelIndex = g_Game.PrecacheModel( g_szPlayerArrowSprite );
 	g_iPlayerArrowSprite2ModelIndex = g_Game.PrecacheModel( g_szPlayerArrowSprite2 );
-
-	//g_Game.PrecacheGeneric( "sound/" + m_szEliminatedSndName );
 
 	g_SoundSystem.PrecacheSound( g_szPlayerGrabSound );
 	g_SoundSystem.PrecacheSound( g_szPlayerGrabReleaseSound );
@@ -5926,7 +7632,9 @@ void MapInit()
 	
 	@monster_rhino_schedules = @scheds;
 
-    g_Hooks.RegisterHook(Hooks::Player::PlayerAddToFullPack, @PlayerAddToFullPack);
+    g_Hooks.RegisterHook(Hooks::Player::PlayerTouchImpact, @PlayerTouchImpact);
+	//g_Hooks.RegisterHook(Hooks::Player::PlayerAddToFullPack, @PlayerAddToFullPack);
+	g_Hooks.RegisterHook(Hooks::Player::ClientDisconnect, @ClientDisconnect);
 	g_Hooks.RegisterHook(Hooks::Player::PlayerSpawn, @PlayerSpawn);
     g_Hooks.RegisterHook(Hooks::Player::PlayerTakeDamage, @PlayerTakeDamage);
     g_Hooks.RegisterHook(Hooks::Player::PlayerPreThink, @PlayerPreThink);
