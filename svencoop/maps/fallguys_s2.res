@@ -127,6 +127,12 @@ models/fallguys/door3.mdl
 models/fallguys/door4.mdl
 models/fallguys/door5.mdl
 models/fallguys/door6.mdl
+models/fallguys/door7.mdl
+models/fallguys/door8.mdl
+models/fallguys/door9.mdl
+models/fallguys/door10.mdl
+models/fallguys/door11.mdl
+models/fallguys/door12.mdl
 models/fallguys/drum.mdl
 models/fallguys/drum2.mdl
 models/fallguys/drum2rot.mdl

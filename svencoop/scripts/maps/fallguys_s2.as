@@ -4,6 +4,7 @@ const float c_PlayerImpactPlayer_VelocityTransferEfficiency = 0.75;
 
 const float c_PlayerGrab_Range = 48.0;
 const float c_PlayerGrab_Velocity = 2500.0;
+const float c_PlayerDefaultMaxSpeed = 270.0;
 
 const int LOD_BODY = 1;
 const int LOD_MODELINDEX = 2;
@@ -84,7 +85,20 @@ class CPlayerBlockStateItem
 	string szPlayingSound;
 }
 
+class CPlayerFreezeStateItem
+{
+	CPlayerFreezeStateItem(){
+		bIsFreezing = false;
+		flLastFreezeTime = 0;
+		iLastFreezerEntity = 0;
+	}
+	bool bIsFreezing;
+	float flLastFreezeTime;
+	int iLastFreezerEntity;
+}
+
 array<CPlayerBlockStateItem> g_ArrayBlockPlayer(33);
+array<CPlayerFreezeStateItem> g_ArrayFreezePlayer(33);
 
 array<int> g_ArrayGrabPlayer(33);
 
@@ -6250,7 +6264,7 @@ class CTriggerPlayerHat : ScriptBaseEntity
 			if(pActivator !is null && pActivator.IsPlayer())
 			{				
 				CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pActivator);
-				PlayerShowHat(pPlayer, m_szHatModel);
+				PlayerShowHat(pPlayer, pPlayer.entindex(), m_szHatModel);
 			}
 		}
 	}
@@ -6450,6 +6464,9 @@ class CTriggerFindBrush : ScriptBaseEntity
 
 class CTriggerFreeze : ScriptBaseEntity
 {
+	int m_iNewMaxSpeed = 0;
+	float m_flNewGravity = 1;
+
 	void Precache()
 	{
 		BaseClass.Precache();
@@ -6467,7 +6484,16 @@ class CTriggerFreeze : ScriptBaseEntity
 	}
 
 	bool KeyValue( const string & in szKey, const string & in szValue )
-	{	
+	{
+		if(szKey == "newmaxspeed"){
+			m_iNewMaxSpeed = atoi(szValue);
+			return true;
+		}
+		if(szKey == "newgravity"){
+			m_flNewGravity = atoi(szValue);
+			return true;
+		}
+
 		return BaseClass.KeyValue( szKey, szValue );
 	}
 	
@@ -6479,11 +6505,39 @@ class CTriggerFreeze : ScriptBaseEntity
 		if(!pOther.IsAlive())
 			return;
 
-		CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pOther);
 		if((self.pev.spawnflags & 1) == 1)
-			pPlayer.SetMaxSpeedOverride(0);
-		else
-			pPlayer.SetMaxSpeedOverride(-1);
+		{
+			CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pOther);
+
+			int playerIndex = pPlayer.entindex();
+
+			g_ArrayFreezePlayer[playerIndex].bIsFreezing = true;
+			g_ArrayFreezePlayer[playerIndex].flLastFreezeTime = g_Engine.time;
+			g_ArrayFreezePlayer[playerIndex].iLastFreezerEntity = self.entindex();
+			pPlayer.SetMaxSpeedOverride(m_iNewMaxSpeed);
+			pPlayer.pev.gravity = m_flNewGravity;
+		}
+	}
+
+	void UnfreezePlayers()
+	{
+		for (int i = 1; i <= g_Engine.maxClients; i++)
+		{
+			CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
+			if(pPlayer !is null &&
+				pPlayer.IsConnected() &&
+				g_ArrayFreezePlayer[i].bIsFreezing &&
+				g_ArrayFreezePlayer[i].iLastFreezerEntity == self.entindex()
+				)
+			{
+				pPlayer.SetMaxSpeedOverride(-1);
+				pPlayer.pev.gravity = 1;
+
+				g_ArrayFreezePlayer[i].bIsFreezing = false;
+				g_ArrayFreezePlayer[i].flLastFreezeTime = 0;
+				g_ArrayFreezePlayer[i].iLastFreezerEntity = 0;
+			}
+		}
 	}
 
 	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
@@ -6494,14 +6548,7 @@ class CTriggerFreeze : ScriptBaseEntity
 			{
 				self.pev.spawnflags &= ~1;
 				
-				for (int i = 0; i <= g_Engine.maxClients; i++)
-				{
-					CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
-					if(pPlayer !is null && pPlayer.IsConnected())
-					{
-						pPlayer.SetMaxSpeedOverride(-1);
-					}
-				}
+				UnfreezePlayers();
 			}
 			else
 			{
@@ -6518,23 +6565,18 @@ class CTriggerFreeze : ScriptBaseEntity
 			{
 				self.pev.spawnflags &= ~1;
 				
-				for (int i = 0; i <= g_Engine.maxClients; i++)
-				{
-					CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
-					if(pPlayer !is null && pPlayer.IsConnected())
-					{
-						pPlayer.SetMaxSpeedOverride(-1);
-					}
-				}
+				UnfreezePlayers();
 			}
 		}
 		else if(useType == USE_SET)
 		{
-			if((self.pev.spawnflags & 1) == 1 && !(flValue > 0))
+			//Do we really need this?
+
+			/*if((self.pev.spawnflags & 1) == 1 && !(flValue > 0))
 			{
 				self.pev.spawnflags &= ~1;
 				
-				for (int i = 0; i <= g_Engine.maxClients; i++)
+				for (int i = 1; i <= g_Engine.maxClients; i++)
 				{
 					CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
 					if(pPlayer !is null && pPlayer.IsConnected())
@@ -6546,7 +6588,7 @@ class CTriggerFreeze : ScriptBaseEntity
 			else if((self.pev.spawnflags & 1) != 1 && (flValue > 0))
 			{
 				self.pev.spawnflags |= 1;
-			}
+			}*/
 		}
 	}
 }
@@ -7198,8 +7240,10 @@ HookReturnCode PlayerAddToFullPack( entity_state_t@ state, int e, edict_t @ent, 
 
 HookReturnCode ClientDisconnect(CBasePlayer@ pPlayer)
 {
-	PlayerHideArrow(pPlayer);
-	PlayerHideHat(pPlayer);
+	int playerIndex = pPlayer.entindex();
+
+	PlayerHideArrow(pPlayer, playerIndex);
+	PlayerHideHat(pPlayer, playerIndex);
 
     return HOOK_CONTINUE;
 }
@@ -7212,6 +7256,8 @@ HookReturnCode PlayerSpawn(CBasePlayer@ pPlayer)
 	NetworkMessage message( MSG_ONE, NetworkMessages::SVC_STUFFTEXT, pPlayer.edict() );
 		message.WriteString("thirdperson\n");
 	message.End();
+
+	pPlayer.SetMaxSpeed(c_PlayerDefaultMaxSpeed);
 
     return HOOK_CONTINUE;
 }
@@ -7232,10 +7278,8 @@ HookReturnCode PlayerTakeDamage(DamageInfo@ info)
     return HOOK_CONTINUE;
 }
 
-void PlayerJump(CBasePlayer@ pPlayer)
+void PlayerJump(CBasePlayer@ pPlayer, int playerIndex)
 {
-	int playerindex = pPlayer.entindex();
-
 	if ((pPlayer.pev.flags & FL_WATERJUMP) == FL_WATERJUMP)
 		return;
 
@@ -7245,77 +7289,92 @@ void PlayerJump(CBasePlayer@ pPlayer)
 	if ((pPlayer.pev.flags & FL_ONGROUND) == 0)
 		return;
 
-	g_ArrayPlayerJumpState[playerindex] = 1;
+	g_ArrayPlayerJumpState[playerIndex] = 1;
 
 	if(pPlayer.pev.groundentity !is null)
 	{
-		g_ArrayPlayerJumpPreGroundEntity[playerindex] = g_EngineFuncs.IndexOfEdict(pPlayer.pev.groundentity);
+		g_ArrayPlayerJumpPreGroundEntity[playerIndex] = g_EngineFuncs.IndexOfEdict(pPlayer.pev.groundentity);
 	}
 	else
 	{
-		g_ArrayPlayerJumpPreGroundEntity[playerindex] = 0;
+		g_ArrayPlayerJumpPreGroundEntity[playerIndex] = 0;
 	}
 }
 
-void PlayerJumped(CBasePlayer@ pPlayer)
+void PlayerJumped(CBasePlayer@ pPlayer, int playerIndex)
 {
-	int playerindex = pPlayer.entindex();
-
-	if(g_ArrayPlayerJumpState[playerindex] != 1)
+	if(g_ArrayPlayerJumpState[playerIndex] != 1)
 		return;
 
-	if(g_Engine.time > g_ArrayJumpPlayer[playerindex]){
+	if(g_Engine.time > g_ArrayJumpPlayer[playerIndex]){
 
-		g_ArrayPlayerJumpState[playerindex] = 2;
+		g_ArrayPlayerJumpState[playerIndex] = 2;
 
 		g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_VOICE, g_szPlayerJumpSound[Math.RandomLong(0, 7)], 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
 	
-		g_ArrayJumpPlayer[playerindex] = g_Engine.time + 0.5;
+		g_ArrayJumpPlayer[playerIndex] = g_Engine.time + 0.5;
 	}
 }
 
-void PlayerFalling(CBasePlayer@ pPlayer)
+void PlayerFalling(CBasePlayer@ pPlayer, int playerIndex)
 {
-	int playerindex = pPlayer.entindex();
-	if(g_ArrayFallingPlayer[playerindex] == false){
+	if(g_ArrayFallingPlayer[playerIndex] == false){
 
 		string szSoundName = g_szPlayerFallingSound[Math.RandomLong(0, 1)];
 
 		g_SoundSystem.EmitSoundDyn( pPlayer.edict(), CHAN_VOICE, szSoundName, 1.0, 1.0, 0, 90 + Math.RandomLong(0, 20) );
 
-		g_ArrayFallingPlayer[playerindex] = true;
-		g_ArrayFallingPlayerPlayingSound[playerindex] = szSoundName;
+		g_ArrayFallingPlayer[playerIndex] = true;
+		g_ArrayFallingPlayerPlayingSound[playerIndex] = szSoundName;
 	}
 }
 
-void PlayerStopFall(CBasePlayer@ pPlayer)
+void PlayerStopFall(CBasePlayer@ pPlayer, int playerIndex)
 {
-	int playerindex = pPlayer.entindex();
-	if(g_ArrayFallingPlayer[playerindex] == true){
+	if(g_ArrayFallingPlayer[playerIndex] == true){
 
-		g_SoundSystem.StopSound( pPlayer.edict(), CHAN_VOICE, g_ArrayFallingPlayerPlayingSound[playerindex] );
+		g_SoundSystem.StopSound( pPlayer.edict(), CHAN_VOICE, g_ArrayFallingPlayerPlayingSound[playerIndex] );
 
-		g_ArrayFallingPlayer[playerindex] = false;
+		g_ArrayFallingPlayer[playerIndex] = false;
 	}
 }
 
-void PlayerStopBlock(CBasePlayer@ pPlayer)
+void PlayerStopBlock(CBasePlayer@ pPlayer, int playerIndex)
 {
-	int playerindex = pPlayer.entindex();
-	g_ArrayBlockPlayer[playerindex].IsBlocking = false;
-
-	if(g_ArrayBlockPlayer[playerindex].flLastSoundTime > 0 && 
-		!g_ArrayBlockPlayer[playerindex].szPlayingSound.IsEmpty())
+	if(g_ArrayBlockPlayer[playerIndex].IsBlocking &&
+		g_Engine.time > g_ArrayBlockPlayer[playerIndex].flLastBlockTime + 0.1)
 	{
-		g_SoundSystem.StopSound( pPlayer.edict(), CHAN_BODY, g_ArrayBlockPlayer[playerindex].szPlayingSound );
+		g_ArrayBlockPlayer[playerIndex].IsBlocking = false;
 
-		g_ArrayBlockPlayer[playerindex].flLastSoundTime = 0;
+		if(g_ArrayBlockPlayer[playerIndex].flLastSoundTime > 0 && 
+			!g_ArrayBlockPlayer[playerIndex].szPlayingSound.IsEmpty())
+		{
+			g_SoundSystem.StopSound( pPlayer.edict(), CHAN_BODY, g_ArrayBlockPlayer[playerIndex].szPlayingSound );
+
+			g_ArrayBlockPlayer[playerIndex].flLastSoundTime = 0;
+		}
 	}
 }
 
-void PlayerShowArrow(CBasePlayer@ pPlayer)
+void PlayerStopFreeze(CBasePlayer@ pPlayer, int playerIndex)
 {
-	EHandle eHandle = g_ArrayArrowEntityPlayer[pPlayer.entindex()];
+	if(g_ArrayFreezePlayer[playerIndex].bIsFreezing)
+	{
+		if(g_Engine.time > g_ArrayFreezePlayer[playerIndex].flLastFreezeTime + 0.05)
+		{
+			pPlayer.SetMaxSpeedOverride(-1);
+			pPlayer.pev.gravity = 1;
+
+			g_ArrayFreezePlayer[playerIndex].bIsFreezing = false;
+			g_ArrayFreezePlayer[playerIndex].flLastFreezeTime = 0;
+			g_ArrayFreezePlayer[playerIndex].iLastFreezerEntity = 0;
+		}
+	}
+}
+
+void PlayerShowArrow(CBasePlayer@ pPlayer, int playerIndex)
+{
+	EHandle eHandle = g_ArrayArrowEntityPlayer[playerIndex];
 
 	if(eHandle.IsValid())
 		return;
@@ -7344,9 +7403,9 @@ void PlayerShowArrow(CBasePlayer@ pPlayer)
 	g_ArrayArrowEntityPlayer[pPlayer.entindex()] = EHandle(@pEntity);
 }
 
-void PlayerHideArrow(CBasePlayer@ pPlayer)
+void PlayerHideArrow(CBasePlayer@ pPlayer, int playerIndex)
 {
-	EHandle eHandle = g_ArrayArrowEntityPlayer[pPlayer.entindex()];
+	EHandle eHandle = g_ArrayArrowEntityPlayer[playerIndex];
 
 	if(!eHandle.IsValid())
 		return;
@@ -7354,9 +7413,9 @@ void PlayerHideArrow(CBasePlayer@ pPlayer)
 	eHandle.GetEntity().SUB_Remove();
 }
 
-void PlayerShowHat(CBasePlayer@ pPlayer, string szHatModel)
+void PlayerShowHat(CBasePlayer@ pPlayer, int playerIndex, string szHatModel)
 {
-	EHandle eHandle = g_ArrayHatEntityPlayer[pPlayer.entindex()];
+	EHandle eHandle = g_ArrayHatEntityPlayer[playerIndex];
 
 	if(eHandle.IsValid())
 		return;
@@ -7365,20 +7424,16 @@ void PlayerShowHat(CBasePlayer@ pPlayer, string szHatModel)
 	g_EntityFuncs.SetModel(pEntity, szHatModel);
 	pEntity.pev.sequence = 0;
 	pEntity.pev.frame = 0;
-	//pEntity.pev.scale = 0.15;
 	@pEntity.pev.aiment = pPlayer.edict();
 	pEntity.pev.movetype = MOVETYPE_FOLLOW;
 	pEntity.pev.rendermode = kRenderNormal;
 
-	//pEntity.pev.iuser4 = g_iPlayerArrowSpriteMagicNumber;
-	//pEntity.pev.iuser1 = pPlayer.entindex();
-
 	g_ArrayHatEntityPlayer[pPlayer.entindex()] = EHandle(@pEntity);
 }
 
-void PlayerHideHat(CBasePlayer@ pPlayer)
+void PlayerHideHat(CBasePlayer@ pPlayer, int playerIndex)
 {
-	EHandle eHandle = g_ArrayHatEntityPlayer[pPlayer.entindex()];
+	EHandle eHandle = g_ArrayHatEntityPlayer[playerIndex];
 
 	if(!eHandle.IsValid())
 		return;
@@ -7399,7 +7454,7 @@ HookReturnCode PlayerPreThink(CBasePlayer@ pPlayer, uint& out uiFlags)
 	{
 		if((pPlayer.pev.button & IN_JUMP) == IN_JUMP && (pPlayer.pev.oldbuttons & IN_JUMP) == 0)
 		{
-			PlayerJump(pPlayer);
+			PlayerJump(pPlayer, playerIndex);
 		}
 
 		if(g_ArrayBounceVelocityPlayer[playerIndex] != g_vecZero)
@@ -7425,19 +7480,16 @@ HookReturnCode PlayerPostThink(CBasePlayer@ pPlayer)
 	//Real velocity, Used in pfnTouch
 	g_ArrayVelocityPlayer[playerIndex] = pPlayer.pev.velocity;
 
-	if(g_ArrayBlockPlayer[playerIndex].IsBlocking &&
-		g_Engine.time > g_ArrayBlockPlayer[playerIndex].flLastBlockTime + 0.1)
-	{
-		PlayerStopBlock(pPlayer);
-	}
+	PlayerStopBlock(pPlayer, playerIndex);
+	PlayerStopFreeze(pPlayer, playerIndex);
 
 	if(pPlayer.IsAlive())
 	{
-		PlayerShowArrow(pPlayer);
+		PlayerShowArrow(pPlayer, playerIndex);
 	}
 	else
 	{
-		PlayerHideArrow(pPlayer);
+		PlayerHideArrow(pPlayer, playerIndex);
 	}
 
 	if(pPlayer.IsAlive())
@@ -7446,21 +7498,21 @@ HookReturnCode PlayerPostThink(CBasePlayer@ pPlayer)
 
 		if((pPlayer.pev.flags & FL_ONGROUND) == 0)
 		{
-			PlayerJumped(pPlayer);
+			PlayerJumped(pPlayer, playerIndex);
 
 			if(pPlayer.pev.velocity.z < -400.0)
 			{
-				PlayerFalling(pPlayer);
+				PlayerFalling(pPlayer, playerIndex);
 			}
 		}
 		else
 		{
-			PlayerStopFall(pPlayer);
+			PlayerStopFall(pPlayer, playerIndex);
 		}
 	}
 	else
 	{
-		PlayerStopFall(pPlayer);
+		PlayerStopFall(pPlayer, playerIndex);
 	}
 
     return HOOK_CONTINUE;
@@ -7569,7 +7621,6 @@ HookReturnCode PlayerUse(CBasePlayer@ pPlayer, uint& out uiFlags)
     return HOOK_CONTINUE;
 }
 
-/*
 const bool doCommand(CBasePlayer@ plr, const CCommand@ args, bool inConsole) {
 
   if (args.ArgC() >= 2 && args[0] == ".fgtest") {
@@ -7585,9 +7636,7 @@ const bool doCommand(CBasePlayer@ plr, const CCommand@ args, bool inConsole) {
   }
   else if (args.ArgC() == 1 && args[0] == ".fgtest") {
 
-		plr.pev.origin = Vector(-6180, -6918, 1040);
-		plr.pev.origin = Vector(-1608, -6604, 1068);
-		plr.pev.origin = Vector(6509, 3456, -1860);
+		plr.pev.origin = Vector(-6521, -6678, -1032);
 		return true;
   }
   return false;
@@ -7599,7 +7648,6 @@ void consoleCmd(const CCommand@ args) {
 
 CClientCommand _test("fgtest", "fgtest commands", @consoleCmd);
 CClientCommand _test2("fgtest2", "fgtest2 commands", @consoleCmd);
-*/
 
 void ClearErrors()
 {
