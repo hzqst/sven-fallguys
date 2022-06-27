@@ -173,6 +173,8 @@
 	[
 		1 : "Start On" 	: 0
 	]
+	newmaxspeed(integer) : "New Max Speed Override" : "0"
+	newgravity(integer) : "Max Gravity Override" : "0"
 ]
 
 @SolidClass base(Targetname, ZHLTbmodel, Target) color(255 255 255) = trigger_findbrush : "Find first brush in box and trigger it"
