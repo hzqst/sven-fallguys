@@ -260,6 +260,144 @@ class CEnvSkinButton : ScriptBaseEntity
 	}
 }
 
+class CEnvHexagonTile : ScriptBaseEntity
+{
+	Vector m_vecHalfExtent = Vector(1.0, 1.0, 1.0);
+	array<int> m_TileStates(5);
+	array<float> m_TileChangeState(5);
+
+	void Precache()
+	{
+		BaseClass.Precache();
+
+		g_Game.PrecacheModel( self.pev.model );
+	}
+
+	bool KeyValue( const string & in szKey, const string & in szValue )
+	{
+		if(szKey == "halfextent"){
+			g_Utility.StringToVector( m_vecHalfExtent, szValue );
+			return true;
+		}
+
+		return BaseClass.KeyValue( szKey, szValue );
+	}
+
+	void Restart()
+	{
+		self.pev.solid = SOLID_BBOX;
+		self.pev.movetype = MOVETYPE_NOCLIP;
+
+		g_EntityFuncs.SetModel( self, self.pev.model );
+
+		Vector mins = m_vecHalfExtent * -1;
+		Vector maxs = m_vecHalfExtent;
+		g_EntityFuncs.SetSize( self.pev, mins, maxs );
+		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+
+		self.pev.sequence = 0;
+		self.pev.skin = 0;
+		self.pev.effects &= ~EF_NODRAW;
+
+		m_TileStates[0] = 0;
+		m_TileStates[1] = 0;
+		m_TileStates[2] = 0;
+		m_TileStates[3] = 0;
+		m_TileStates[4] = 0;
+		m_TileChangeState[0] = 0; 
+		m_TileChangeState[1] = 0; 
+		m_TileChangeState[2] = 0; 
+		m_TileChangeState[3] = 0; 
+		m_TileChangeState[4] = 0; 
+	}
+
+	void Spawn()
+	{
+		Precache();
+
+		self.pev.solid = SOLID_BBOX;
+		self.pev.movetype = MOVETYPE_NOCLIP;
+
+		g_EntityFuncs.SetModel( self, self.pev.model );
+
+		Vector mins = m_vecHalfExtent * -1;
+		Vector maxs = m_vecHalfExtent;
+		g_EntityFuncs.SetSize( self.pev, mins, maxs );
+		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+
+		m_TileStates[0] = 0;
+		m_TileStates[1] = 0;
+		m_TileStates[2] = 0;
+		m_TileStates[3] = 0;
+		m_TileStates[4] = 0;
+		m_TileChangeState[0] = 0; 
+		m_TileChangeState[1] = 0; 
+		m_TileChangeState[2] = 0; 
+		m_TileChangeState[3] = 0; 
+		m_TileChangeState[4] = 0; 
+	}
+
+	void Touch( CBaseEntity@ pOther )
+	{
+		if(pOther.IsPlayer() && pOther.IsAlive())
+		{
+			if((pOther.pev.flags & FL_ONGROUND) == FL_ONGROUND && (pOther.pev.groundentity is self.edict() ))
+			{
+				CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pOther);
+				if(pPlayer.GetMaxSpeedOverride() == 0)
+					return;
+
+				int tileIndex = g_Engine.trace_hitgroup;
+				if(m_TileStates[tileIndex] == 0)
+				{
+					self.pev.skin |= (1 << tileIndex);
+
+					m_TileStates[tileIndex] = 1;
+					m_TileChangeState[tileIndex] = g_Engine.time + 0.75;
+					
+					self.pev.nextthink = g_Engine.time + 0.1;
+					SetThink(ThinkFunction(this.Animate));
+				}
+			}
+		}
+	}
+
+	void Animate()
+	{
+		bool bStateChanging = false;
+
+		for(int tileIndex = 0; tileIndex < 5; ++tileIndex)
+		{
+			if(m_TileStates[tileIndex] == 1)
+			{
+				if(g_Engine.time > m_TileChangeState[tileIndex])
+				{
+					self.pev.sequence |= (1 << tileIndex);
+					m_TileStates[tileIndex] = 2;
+
+					if(self.pev.sequence == 31){
+						self.pev.effects |= EF_NODRAW;
+					}
+				}
+				else
+				{
+					bStateChanging = true;
+				}
+			}
+		}
+
+		if(bStateChanging)
+		{
+			self.pev.nextthink = g_Engine.time + 0.1;
+			SetThink(ThinkFunction(this.Animate));
+		}
+		else
+		{
+			SetThink(null);
+		}
+	}
+}
+
 class CEnvPhysicModel : ScriptBaseEntity
 {
 	Vector m_vecHalfExtent = Vector(1.0, 1.0, 1.0);
@@ -344,8 +482,6 @@ class CEnvPhysicModel : ScriptBaseEntity
 		self.pev.solid = SOLID_BBOX;
 		self.pev.movetype = MOVETYPE_NOCLIP;
 
-		//self.pev.iuser4 = g_iLodStudioModelMagicNumber;
-
 		g_EntityFuncs.SetModel( self, self.pev.model );
 
 		Vector mins = m_vecHalfExtent * -1;
@@ -363,6 +499,8 @@ class CEnvPhysicModel : ScriptBaseEntity
 			m_flCCDRadius,
 			m_flCCDThreshold,
 			((self.pev.spawnflags & SF_ENV_PHYSMODEL_PUSHABLE) == SF_ENV_PHYSMODEL_PUSHABLE) ? true : false);
+
+			SetTouch(TouchFunction(this.PhysicTouch));
 		}
 
 		if(self.pev.fuser1 > 0 || self.pev.fuser2 > 0 || self.pev.fuser3 > 0)
@@ -377,7 +515,7 @@ class CEnvPhysicModel : ScriptBaseEntity
 		}
 	}
 
-	void Touch( CBaseEntity@ pOther )
+	void PhysicTouch( CBaseEntity@ pOther )
 	{
 		if(pOther.IsPlayer() && pOther.IsAlive())
 		{
@@ -4195,6 +4333,11 @@ class CFuncTipTile : ScriptBaseEntity
 
 class CTriggerHUDSprite : ScriptBaseEntity
 {
+	string m_szText = "";
+	float m_flTextOffsetX = 0;
+	float m_flTextOffsetY = 0;
+	int m_iTextChannel = 1;
+
 	string m_szSprName = "";
 	string m_szSoundName = "";
 	int m_nFrameNum = 0;
@@ -4209,12 +4352,11 @@ class CTriggerHUDSprite : ScriptBaseEntity
 	void Precache()
 	{
 		BaseClass.Precache();
-		if(m_szSprName != ""){
+		if(!m_szSprName.IsEmpty()){
 			g_Game.PrecacheModel( "sprites/" +  m_szSprName );
     		g_Game.PrecacheGeneric("sprites/" + m_szSprName );
 		}
-		if(m_szSoundName != ""){
-    	//	g_Game.PrecacheGeneric( "sound/" + m_szSoundName );
+		if(!m_szSoundName.IsEmpty()){
 			g_SoundSystem.PrecacheSound( m_szSoundName );
 		}
 	}
@@ -4222,6 +4364,7 @@ class CTriggerHUDSprite : ScriptBaseEntity
 	void Spawn()
 	{
 		Precache();
+
 		self.pev.solid = SOLID_NOT;
 		self.pev.movetype = MOVETYPE_NONE;
 
@@ -4268,8 +4411,46 @@ class CTriggerHUDSprite : ScriptBaseEntity
 		    m_nSprHeight = atoi(szValue);
 			return true;
 		}
+		if(szKey == "text"){
+		    m_szText = szValue;
+			return true;
+		}
+		if(szKey == "textoffsetx"){
+		    m_flTextOffsetX = atof(szValue);
+			return true;
+		}
+		if(szKey == "textoffsety"){
+		    m_flTextOffsetY = atof(szValue);
+			return true;
+		}
+		if(szKey == "textchannel"){
+		    m_iTextChannel = atoi(szValue);
+			return true;
+		}
 
 		return BaseClass.KeyValue( szKey, szValue );
+	}
+
+	void SendText( CBasePlayer@ pPlayer, const string& in str, float hold = 0.8 )
+	{
+		HUDTextParams textParams;
+		textParams.x = -1;
+		textParams.y = 0.70;
+		textParams.effect = 0;
+		textParams.r1 = 255;
+		textParams.g1 = 255;
+		textParams.b1 = 255;
+		textParams.a1 = 255;
+		textParams.r2 = 255;
+		textParams.g2 = 255;
+		textParams.b2 = 255;
+		textParams.a2 = 255;
+		textParams.fadeinTime = 0.1;
+		textParams.fadeoutTime = 0.1;
+		textParams.holdTime = hold;
+		textParams.fxTime = 0.0;
+		textParams.channel = m_iTextChannel;
+		g_PlayerFuncs.HudMessage(pPlayer, textParams, str);
 	}
 	
 	void SendSprite( CBasePlayer@ pPlayer, const string& in strName, uint framenum = 0, float hold = 0.8 )
@@ -4350,10 +4531,6 @@ class CTriggerHUDSprite : ScriptBaseEntity
 				{
 					CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pActivator);
 					
-					//NetworkMessage message( MSG_ONE, NetworkMessages::SVC_STUFFTEXT, pPlayer.edict() );
-					//	message.WriteString("spk " + m_szSoundName+"\n");
-					//message.End();
-
 					g_SoundSystem.PlaySound(pPlayer.edict(), CHAN_STATIC, m_szSoundName, 1, 0.01, 0, PITCH_NORM, pPlayer.entindex());
 				}
 				else
@@ -4363,11 +4540,43 @@ class CTriggerHUDSprite : ScriptBaseEntity
 						CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
 						if(pPlayer !is null && pPlayer.IsConnected())
 						{
-							//NetworkMessage message( MSG_ONE, NetworkMessages::SVC_STUFFTEXT, pPlayer.edict() );
-							//	message.WriteString("spk " + m_szSoundName+"\n");
-							//message.End();
-
 							g_SoundSystem.PlaySound(pPlayer.edict(), CHAN_STATIC, m_szSoundName, 1, 0.01, 0, PITCH_NORM, pPlayer.entindex());
+						}
+					}
+				}
+			}
+		}
+
+		if(!m_szText.IsEmpty())
+		{
+			if(useType == USE_OFF)
+			{
+
+			}
+			else
+			{
+				if(pActivator !is null && pActivator.IsPlayer() && pActivator.IsNetClient())
+				{
+					CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pActivator);
+					
+					if((self.pev.spawnflags & 8)== 8){
+						SendText(pPlayer, m_szText + int(flValue), m_flHoldTime);
+					} else {
+						SendText(pPlayer, m_szText, m_flHoldTime);
+					}
+				}
+				else
+				{
+					for (int i = 0; i <= g_Engine.maxClients; i++)
+					{
+						CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
+						if(pPlayer !is null && pPlayer.IsConnected())
+						{
+							if((self.pev.spawnflags & 8)== 8){
+								SendText(pPlayer, m_szText + int(flValue), m_flHoldTime);
+							} else {
+								SendText(pPlayer, m_szText, m_flHoldTime);
+							}
 						}
 					}
 				}
@@ -6124,6 +6333,8 @@ class CTriggerCreateEnts : ScriptBaseEntity
 	Vector m_ColOffset = g_vecZero;
 	int m_iColumnCount = 0;
 
+	float m_flHexRadius = 0;
+
 	dictionary m_KeyValues;
 
 	void Precache()
@@ -6151,6 +6362,11 @@ class CTriggerCreateEnts : ScriptBaseEntity
 
 		if(szKey == "colcount"){
 			m_iColumnCount = atoi(szValue);
+			return true;
+		}
+		
+		if(szKey == "hexradius"){
+			m_flHexRadius = atof(szValue);
 			return true;
 		}
 		
@@ -6182,12 +6398,60 @@ class CTriggerCreateEnts : ScriptBaseEntity
 		return BaseClass.KeyValue( szKey, szValue );
 	}
 
+	void CreateHexagons( CBaseEntity @pTarget )
+	{
+		for(int i = -m_iRowCount + 1;i < m_iRowCount; ++i)
+		{
+			for(int j = -m_iColumnCount + 1;j < m_iColumnCount; ++j)
+			{
+				Vector vecOrigin = self.pev.origin;
+				vecOrigin = vecOrigin + m_RowOffset * float(i);
+				vecOrigin = vecOrigin + m_ColOffset * float(j);
+
+				Vector vDiff = vecOrigin - self.pev.origin;
+				if(vDiff.Length() > m_flHexRadius)
+					continue;
+
+				CBaseEntity@ pEntity = g_EntityFuncs.CreateEntity(m_iszCrtEntChildClass, m_KeyValues, false);
+				pEntity.pev.angles = g_vecZero;
+				pEntity.pev.origin = vecOrigin;
+				pEntity.pev.model = pTarget.pev.model;
+
+				int cell = (j + i * m_iColumnCount);
+				pEntity.pev.targetname = m_iszCrtEntChildName + cell;
+
+				g_EntityFuncs.DispatchSpawn(pEntity.edict());
+			}
+		}
+	}
+
+	void CreateQuads( CBaseEntity @pTarget )
+	{
+		for(int i = 0;i < m_iRowCount; ++i)
+		{
+			for(int j = 0;j < m_iColumnCount; ++j)
+			{
+				Vector vecOrigin = self.pev.origin;
+				vecOrigin = vecOrigin + m_RowOffset * float(i);
+				vecOrigin = vecOrigin + m_ColOffset * float(j);
+
+				CBaseEntity@ pEntity = g_EntityFuncs.CreateEntity(m_iszCrtEntChildClass, m_KeyValues, false);
+				pEntity.pev.angles = g_vecZero;
+				pEntity.pev.origin = vecOrigin;
+				pEntity.pev.model = pTarget.pev.model;
+
+				int cell = (j + i * m_iColumnCount);
+				pEntity.pev.targetname = m_iszCrtEntChildName + cell;
+
+				g_EntityFuncs.DispatchSpawn(pEntity.edict());
+			}
+		}
+	}
+
 	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
 	{
-		if(useType == USE_TOGGLE)
+		if(useType == USE_TOGGLE || useType == USE_ON || useType == USE_SET)
 		{
-			//Create ents as usual
-
 			if(m_iszCrtEntChildClass.IsEmpty())
 				return;
 
@@ -6199,24 +6463,13 @@ class CTriggerCreateEnts : ScriptBaseEntity
 			if(pTarget is null)
 				return;
 
-			for(int i = 0;i < m_iRowCount; ++i)
+			if((self.pev.spawnflags & 2) == 2)
 			{
-				for(int j = 0;j < m_iColumnCount; ++j)
-				{
-					Vector vecOrigin = self.pev.origin;
-					vecOrigin = vecOrigin + m_RowOffset * float(i);
-					vecOrigin = vecOrigin + m_ColOffset * float(j);
-
-					CBaseEntity@ pEntity = g_EntityFuncs.CreateEntity(m_iszCrtEntChildClass, m_KeyValues, false);
-					pEntity.pev.angles = g_vecZero;
-					pEntity.pev.origin = vecOrigin;
-					pEntity.pev.model = pTarget.pev.model;
-
-					int cell = (j + i * m_iColumnCount);
-					pEntity.pev.targetname = m_iszCrtEntChildName + cell;
-
-					g_EntityFuncs.DispatchSpawn(pEntity.edict());
-				}
+				CreateHexagons(pTarget);
+			}
+			else
+			{
+				CreateQuads(pTarget);
 			}
 		}
 	}
@@ -6270,6 +6523,334 @@ class CTriggerPlayerHat : ScriptBaseEntity
 	}
 }
 
+class CTriggerQualifier : ScriptBaseEntity
+{
+	string m_szSoundName = "";
+
+	string m_szSprName = "";
+	int m_nFrameNum = 0;
+	float m_flOffsetX = 0;
+	float m_flOffsetY = 0;
+	int m_nSprWidth = 0;
+	int m_nSprHeight = 0;
+	int m_iChannel = 14;
+	float m_flHoldTime = 1.0;
+	RGBA m_Color = RGBA_WHITE;
+
+	float m_flGiveFragsFirst = 0;
+	float m_flGiveFragsTopFifty = 0;
+	float m_flGiveFrags = 100;
+
+	string m_szGiveFragsFirstEntity = "";
+	string m_szGiveFragsTopFiftyEntity = "";
+	string m_szGiveFragsEntity = "";
+
+	string m_szWinCounter = "";
+	string m_szCountdownTimer = "";
+	float m_flCountdownValue = 0;
+
+	void Precache()
+	{
+		BaseClass.Precache();
+		if(!m_szSprName.IsEmpty()){
+			g_Game.PrecacheModel( "sprites/" +  m_szSprName );
+    		g_Game.PrecacheGeneric("sprites/" + m_szSprName );
+		}
+		if(!m_szSoundName.IsEmpty()){
+			g_SoundSystem.PrecacheSound( m_szSoundName );
+		}
+	}
+
+	void Spawn()
+	{
+		Precache();
+		self.pev.solid = SOLID_NOT;
+		self.pev.movetype = MOVETYPE_NONE;
+
+		g_EntityFuncs.SetModel( self, self.pev.model );
+		g_EntityFuncs.SetSize( self.pev, self.pev.mins, self.pev.maxs );
+		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+	}
+
+	bool KeyValue( const string & in szKey, const string & in szValue )
+	{	
+		if(szKey == "sprite"){
+		    m_szSprName = szValue;
+			return true;
+		}
+		if(szKey == "framenum"){
+			m_nFrameNum = atoi(szValue);
+			return true;
+		}
+		if(szKey == "holdtime"){
+			m_flHoldTime = atof(szValue);
+			return true;
+		}
+		if(szKey == "sound"){
+		    m_szSoundName = szValue;
+			return true;
+		}
+		if(szKey == "offsetx"){
+		    m_flOffsetX = atof(szValue);
+			return true;
+		}
+		if(szKey == "offsety"){
+		    m_flOffsetY = atof(szValue);
+			return true;
+		}
+		if(szKey == "channel"){
+		    m_iChannel = atoi(szValue);
+			return true;
+		}
+		if(szKey == "sprwidth"){
+		    m_nSprWidth = atoi(szValue);
+			return true;
+		}
+		if(szKey == "sprheight"){
+		    m_nSprHeight = atoi(szValue);
+			return true;
+		}
+
+		if(szKey == "givefragsfirst"){
+		    m_flGiveFragsFirst = atof(szValue);
+			return true;
+		}
+		if(szKey == "givefragsfirstent"){
+		    m_szGiveFragsFirstEntity = szValue;
+			return true;
+		}
+		if(szKey == "givefragstopfifty"){
+		    m_flGiveFragsTopFifty = atof(szValue);
+			return true;
+		}
+		if(szKey == "givefragstopfiftyent"){
+		    m_szGiveFragsTopFiftyEntity = szValue;
+			return true;
+		}
+		if(szKey == "givefrags"){
+		    m_flGiveFrags = atof(szValue);
+			return true;
+		}
+		if(szKey == "givefragsent"){
+		    m_szGiveFragsEntity = szValue;
+			return true;
+		}
+
+		if(szKey == "wincounter"){
+		    m_szWinCounter = szValue;
+			return true;
+		}
+
+		if(szKey == "countdowntimer"){
+		    m_szCountdownTimer = szValue;
+			return true;
+		}
+		if(szKey == "countdownval"){
+		    m_flCountdownValue = atof(szValue);
+			return true;
+		}
+
+		return BaseClass.KeyValue( szKey, szValue );
+	}
+	
+	void SendSprite( CBasePlayer@ pPlayer, const string& in strName, uint framenum = 0, float hold = 0.8 )
+	{
+		g_PlayerFuncs.HudToggleElement(pPlayer, m_iChannel, true);
+
+		HUDSpriteParams params;
+		params.channel = m_iChannel;
+		params.flags = HUD_SPR_MASKED; 
+		if((self.pev.spawnflags & 1) == 1)
+			params.flags |= HUD_ELEM_SCR_CENTER_X;
+		if((self.pev.spawnflags & 2) == 2)
+			params.flags |= HUD_ELEM_SCR_CENTER_Y;
+		params.spritename = strName;
+		params.x = m_flOffsetX;
+		params.y = m_flOffsetY;
+		params.framerate = 0;
+		params.frame = framenum;
+		params.holdTime = hold;
+		params.color1 = m_Color;
+		params.fadeoutTime = 0.1;
+		params.width = m_nSprWidth;
+		params.height = m_nSprHeight;
+		g_PlayerFuncs.HudCustomSprite( pPlayer, params );
+	}
+
+	void Use( CBaseEntity@ pActivator, CBaseEntity@ pCaller, USE_TYPE useType, float flValue )
+	{
+		if(m_szSprName != "")
+		{
+			if(useType == USE_OFF)
+			{
+				if(pActivator !is null && pActivator.IsPlayer() && pActivator.IsNetClient())
+				{
+					CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pActivator);
+					if(pPlayer.IsConnected())
+						g_PlayerFuncs.HudToggleElement(pPlayer, m_iChannel, false);
+				}
+				else
+				{
+					for (int i = 0; i <= g_Engine.maxClients; i++)
+					{
+						CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
+						if(pPlayer !is null && pPlayer.IsConnected())
+							g_PlayerFuncs.HudToggleElement(pPlayer, m_iChannel, false);
+					}
+				}
+			}
+			else
+			{
+				if(pActivator !is null && pActivator.IsPlayer() && pActivator.IsNetClient())
+				{
+					CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pActivator);
+					if(pPlayer.IsConnected())
+						SendSprite(pPlayer, m_szSprName, m_nFrameNum, m_flHoldTime);
+				}
+				else
+				{
+					for (int i = 0; i <= g_Engine.maxClients; i++)
+					{
+						CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
+						if(pPlayer !is null && pPlayer.IsConnected())
+							SendSprite(pPlayer, m_szSprName, m_nFrameNum, m_flHoldTime);
+					}
+				}
+			}
+		}
+
+		if(!m_szSoundName.IsEmpty())
+		{
+			if(useType == USE_OFF)
+			{
+
+			}
+			else
+			{
+				if(pActivator !is null && pActivator.IsPlayer() && pActivator.IsNetClient())
+				{
+					CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pActivator);
+					
+					g_SoundSystem.PlaySound(pPlayer.edict(), CHAN_STATIC, m_szSoundName, 1, 0.01, 0, PITCH_NORM, pPlayer.entindex());
+				}
+				else
+				{
+					for (int i = 0; i <= g_Engine.maxClients; i++)
+					{
+						CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
+						if(pPlayer !is null && pPlayer.IsConnected())
+						{
+							g_SoundSystem.PlaySound(pPlayer.edict(), CHAN_STATIC, m_szSoundName, 1, 0.01, 0, PITCH_NORM, pPlayer.entindex());
+						}
+					}
+				}
+			}
+		}
+
+		float flGiveFrags = m_flGiveFrags;
+		string szGiveFragsEntity = m_szGiveFragsEntity;
+		if(flGiveFrags > 0)
+		{
+			if(!m_szWinCounter.IsEmpty())
+			{
+				CBaseEntity @pTarget = g_EntityFuncs.FindEntityByTargetname( null, m_szWinCounter );
+				if(pTarget !is null)
+				{
+					if(m_flGiveFragsFirst > 0 && pTarget.pev.frags == 0 )
+					{
+						flGiveFrags = m_flGiveFragsFirst;
+						szGiveFragsEntity = m_szGiveFragsFirstEntity;
+					}
+					else if(m_flGiveFragsTopFifty > 0 && pTarget.pev.frags <= GetPlayerCount() * 0.5 )
+					{
+						flGiveFrags = m_flGiveFragsTopFifty;
+						szGiveFragsEntity = m_szGiveFragsTopFiftyEntity;
+					}
+				}
+			}
+			else
+			{
+				if(m_flGiveFragsFirst > 0)
+				{
+					flGiveFrags = m_flGiveFragsFirst;
+					szGiveFragsEntity = m_szGiveFragsFirstEntity;
+				}
+			}
+
+			if(useType == USE_OFF)
+			{
+
+			}
+			else
+			{
+				if(pActivator !is null && pActivator.IsPlayer() && pActivator.IsNetClient())
+				{
+					CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pActivator);
+					
+					pPlayer.pev.frags += flGiveFrags;
+
+					if(!szGiveFragsEntity.IsEmpty())
+						g_EntityFuncs.FireTargets( szGiveFragsEntity, pPlayer, self, USE_TOGGLE, flGiveFrags );
+
+					if((self.pev.spawnflags & 4) == 4)
+					{
+						pPlayer.pev.health = 0.0;
+						pPlayer.pev.deadflag = DEAD_DYING;
+						pPlayer.pev.takedamage = DAMAGE_NO;
+						pPlayer.pev.movetype = MOVETYPE_NOCLIP;
+						pPlayer.pev.solid = SOLID_NOT;
+						pPlayer.pev.gamestate = 1;
+						pPlayer.pev.effects |= EF_NODRAW;
+						pPlayer.GetObserver().StartObserver( pPlayer.pev.origin, pPlayer.pev.angles, false );
+						pPlayer.GetObserver().SetMode(OBS_ROAMING);
+						pPlayer.GetObserver().SetObserverModeControlEnabled(true);
+						pPlayer.SetMaxSpeedOverride( -1 );
+					}
+				}
+				else
+				{
+					for (int i = 0; i <= g_Engine.maxClients; i++)
+					{
+						CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
+						if(pPlayer !is null && pPlayer.IsConnected())
+						{
+							pPlayer.pev.frags += flGiveFrags;
+
+							if(!szGiveFragsEntity.IsEmpty())
+								g_EntityFuncs.FireTargets( szGiveFragsEntity, pPlayer, self, USE_TOGGLE, flGiveFrags );
+							
+							if((self.pev.spawnflags & 4) == 4)
+							{
+								pPlayer.pev.health = 0.0;
+								pPlayer.pev.deadflag = DEAD_DYING;
+								pPlayer.pev.takedamage = DAMAGE_NO;
+								pPlayer.pev.movetype = MOVETYPE_NOCLIP;
+								pPlayer.pev.solid = SOLID_NOT;
+								pPlayer.pev.gamestate = 1;
+								pPlayer.pev.effects |= EF_NODRAW;
+								pPlayer.GetObserver().StartObserver( pPlayer.pev.origin, pPlayer.pev.angles, false );
+								pPlayer.GetObserver().SetMode(OBS_ROAMING);
+								pPlayer.GetObserver().SetObserverModeControlEnabled(true);
+								pPlayer.SetMaxSpeedOverride( -1 );
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if(!m_szWinCounter.IsEmpty())
+		{
+			g_EntityFuncs.FireTargets( m_szWinCounter, pActivator, self, USE_ON, 0 );
+		}
+
+		if(!m_szCountdownTimer.IsEmpty())
+		{
+			g_EntityFuncs.FireTargets( m_szCountdownTimer, pActivator, self, USE_SET, m_flCountdownValue );
+		}
+	}
+}
+
 class CTriggerSortPanel : ScriptBaseEntity
 {
 	string m_szNameStartWith;
@@ -6308,6 +6889,17 @@ class CTriggerSortPanel : ScriptBaseEntity
 		}
 
 		return BaseClass.KeyValue( szKey, szValue );
+	}
+
+	
+	void ClearErrors()
+	{
+		//Clear load_script_error
+		CBaseEntity@ pEntity = null;
+		while((@pEntity = g_EntityFuncs.FindEntityByTargetname(pEntity, "script_load_error")) !is null)
+		{
+			pEntity.SUB_Remove();
+		}
 	}
 
 	void SortPanels()
@@ -7600,7 +8192,7 @@ HookReturnCode PlayerUse(CBasePlayer@ pPlayer, uint& out uiFlags)
 
 	bool bGrabbing = false;
 
-	if ((pPlayer.pev.button & IN_USE) == IN_USE)
+	if ((pPlayer.pev.button & IN_USE) == IN_USE && pPlayer.GetMaxSpeedOverride() > 0)
 	{
 		bGrabbing = PlayerGrab(pPlayer);
 	}
@@ -7621,6 +8213,21 @@ HookReturnCode PlayerUse(CBasePlayer@ pPlayer, uint& out uiFlags)
     return HOOK_CONTINUE;
 }
 
+int GetPlayerCount()
+{
+	int count = 0;
+	for (int i = 0; i <= g_Engine.maxClients; i++)
+	{
+		CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
+		if(pPlayer !is null && pPlayer.IsConnected() && (pPlayer.pev.flags & FL_DORMANT) == 0)
+		{
+			count ++;
+		}
+	}
+
+	return count;
+}
+
 const bool doCommand(CBasePlayer@ plr, const CCommand@ args, bool inConsole) {
 
   if (args.ArgC() >= 2 && args[0] == ".fgtest") {
@@ -7636,7 +8243,7 @@ const bool doCommand(CBasePlayer@ plr, const CCommand@ args, bool inConsole) {
   }
   else if (args.ArgC() == 1 && args[0] == ".fgtest") {
 
-		plr.pev.origin = Vector(-6521, -6678, -1032);
+		plr.pev.origin = Vector(-12160, -6400, 1600);
 		return true;
   }
   return false;
@@ -7649,22 +8256,10 @@ void consoleCmd(const CCommand@ args) {
 CClientCommand _test("fgtest", "fgtest commands", @consoleCmd);
 CClientCommand _test2("fgtest2", "fgtest2 commands", @consoleCmd);
 
-void ClearErrors()
-{
-	//Clear load_script_error
-	CBaseEntity@ pEntity = null;
-	while((@pEntity = g_EntityFuncs.FindEntityByTargetname(pEntity, "script_load_error")) !is null)
-	{
-		pEntity.SUB_Remove();
-	}
-}
-
 void MapInit()
 {
-
-	ClearErrors();
-
 	//Point entity
+	g_CustomEntityFuncs.RegisterCustomEntity( "CEnvHexagonTile", "env_hexagontile" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CEnvPhysicModel", "env_physicmodel" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CEnvStudioModel", "env_studiomodel" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CEnvSkinButton", "env_skinbutton" );
@@ -7685,6 +8280,7 @@ void MapInit()
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerToggleBSP", "trigger_toggle_bsp" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerCreateEnts", "trigger_create_ents" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerPlayerHat", "trigger_player_hat" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerQualifier", "trigger_qualifier" );
 	
 	//Solid entity
 	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncRotatingFg", "func_rotating_fg" );

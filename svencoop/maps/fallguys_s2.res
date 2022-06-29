@@ -1,6 +1,9 @@
 // Created with resguy v9 (September 2018)
 // https://github.com/wootguy/resguy
 
+maps/fallgys_s2.cfg
+maps/fallgys_s2.res
+maps/fallguys_s2_dictionary_schinese.csv
 gfx/env/fallguysskyboxbk.tga
 gfx/env/fallguysskyboxdn.tga
 gfx/env/fallguysskyboxft.tga
@@ -27,6 +30,8 @@ sound/fallguys/doorhit3.ogg
 sound/fallguys/doorhit4.ogg
 sound/fallguys/drum.ogg
 sound/fallguys/eliminated.ogg
+sound/fallguys/faketile.ogg
+sound/fallguys/final.ogg
 sound/fallguys/fruitappear.ogg
 sound/fallguys/fruitdisappear.ogg
 sound/fallguys/grab.ogg
@@ -35,11 +40,6 @@ sound/fallguys/impact1.ogg
 sound/fallguys/impact2.ogg
 sound/fallguys/impact3.ogg
 sound/fallguys/intro.ogg
-sound/fallguys/jump.ogg
-sound/fallguys/jumpwater1.ogg
-sound/fallguys/jumpwater2.ogg
-sound/fallguys/jumpwater3.ogg
-sound/fallguys/jumpwater4.ogg
 sound/fallguys/loading.ogg
 sound/fallguys/matchmaking.ogg
 sound/fallguys/mecha.ogg
@@ -48,7 +48,6 @@ sound/fallguys/mfcountdown2.ogg
 sound/fallguys/mfdisappear.ogg
 sound/fallguys/mfselect.ogg
 sound/fallguys/percussionend.ogg
-sound/fallguys/play.ogg
 sound/fallguys/playerfall1.ogg
 sound/fallguys/playerfall2.ogg
 sound/fallguys/playerhit1.ogg
@@ -89,16 +88,17 @@ sound/fallguys/win.ogg
 sprites/fallguys/countdown.spr
 sprites/fallguys/eliminated.spr
 sprites/fallguys/introdarkgreen.spr
+sprites/fallguys/introgold.spr
 sprites/fallguys/introlightgreen.spr
 sprites/fallguys/introroxo.spr
+sprites/fallguys/medalbronze.spr
+sprites/fallguys/medalgold.spr
+sprites/fallguys/medalsilver.spr
 sprites/fallguys/playerarrow.spr
 sprites/fallguys/playerarrow2.spr
 sprites/fallguys/qualified.spr
-sprites/fallguys/roundend.spr
 sprites/fallguys/roundover.spr
 sprites/fallguys/timer.spr
-sprites/laserbeam.spr
-sprites/boom.spr
 models/fallguys/arch.mdl
 models/fallguys/arch2.mdl
 models/fallguys/arch175.mdl
@@ -141,8 +141,11 @@ models/fallguys/flagbase.mdl
 models/fallguys/gamestart.mdl
 models/fallguys/gametoplay.mdl
 models/fallguys/hammer.mdl
+models/fallguys/hex.mdl
 models/fallguys/hexfloor.mdl
+models/fallguys/hexfloor15.mdl
 models/fallguys/hexwall.mdl
+models/fallguys/hexwall15.mdl
 models/fallguys/logo.mdl
 models/fallguys/logo2.mdl
 models/fallguys/logo3.mdl
