@@ -1,78 +1,122 @@
 # sven-fallguys
 
-Fall Guys in Sven Co-op 
+# Fall Guys in Sven Co-op - Season 2
 
-# Available Content
+### 12 minigames are available now !
 
-## Stage Select
+### Choose RANDOM MODE or CASUAL MODE before game start !
 
-![](/img/stageselect.png)
+### Choose number of games to play before game start !
 
-## Block Party
+### You can push other guys by stepping towards them !
+
+### You can grab other guys by pressing E !
+
+# MINI GAMES
+
+## BLOCK PARTY
 
 * Survival
 
-* Don't fall off!
+* Avoid the moving walls and stay on the platform!
+
+* All survivors gain 150 poionts!
 
 ![](/img/blockparty.png)
 
-## Slime Climb
+## SLIME CLIMB
 
 * Race
 
-* Race to the finish!
+* Outrun the slime and reach the finish line!
+
+* The champion gains 150 points, the top 50% gains 125 points, otherwise gain 100 points!
 
 ![](/img/slimeclimb.png)
 
-## Seesaw
+## SEE SAW
 
 * Race
 
-* Race to the finish!
+* Run and balance across rows of see-saws to reach the finish line before timeout!
+
+* The champion gains 150 points, the top 50% gains 125 points, otherwise gain 100 points!
 
 ![](/img/seesaw.png)
 
-## Perfect Match
+## PERFECT MATCH
 
 * Logic
 
-* Match the icons!
+* Match the icon on the screen to avoid the slime!
+
+* All survivors gain 150 poionts!
 
 ![](/img/matchfall.png)
 
-## Jump Club
+## JUMP CLUB
 
 * Survival
 
-* Don't fall off!
+* Jump over the spinning beam and avoid falling into the slime!
+
+* All survivors gain 150 poionts!
 
 ![](/img/jumpclub.png)
 
-## Roll Out
+## ROLL OUT
 
 * Survival
 
-* Don't fall off!
+* Move between rotating rings to avoid falling into the slime!
+
+* All survivors gain 150 poionts!
 
 ![](/img/rollout.png)
 
-## Whirligig
+## THE WHIRLYGIG
 
 * Race
 
-* Race to the finish!
+* Navigate the obstacles and race to the finish line before timeout!
+
+* The champion gains 150 points, the top 50% gains 125 points, otherwise gain 100 points!
 
 ![](/img/whirligig.png)
 
-## Stompin' Ground
+## STOMPIN' GROUND
 
 * Survival
 
-* Don't fall off!
+* Avoid the charging Rhinos and stay inside the area!
 
-* Bull will knock you off
+* All survivors gain 150 poionts!
 
 ![](/img/stompinground.png)
+
+## DOOR DASH
+
+* Race
+
+* Avoid the fake doors and race to the finish line before timeout!
+
+* The champion gains 150 points, the top 50% gains 125 points, otherwise gain 100 points!
+
+## TIP TOE
+
+* Race
+
+* Avoid the fake tiles and find the hidden path to reach the finish line before timeout!
+
+* The champion gains 150 points, the top 50% gains 125 points, otherwise gain 100 points!
+
+## GATE CRASH
+
+* Race
+
+* Avoid the moving doors and race to the finish line before timeout!
+
+* The champion gains 150 points, the top 50% gains 125 points, otherwise gain 100 points!
 
 ## Eliminated and Victory Board
 
@@ -82,16 +126,16 @@ Fall Guys in Sven Co-op
 
 1. Sven Co-op 5.25 or later
 
-# Optional
+2. [metamod-fallguys plugins for Physic Engine and Angel Script enhancement](https://github.com/hzqst/metamod-fallguys) (Compiled binaries are already included in this repository)
 
-1. metamod plugin (Already included in this repository) for physic-engine enhancement
+* `addons` (metamod) and `liblist.gam` must be installed into `Sven Co-op/svencoop`, not `Sven Co-op/svencoop_addons` or `Sven Co-op/svencoop_download`
 
-* Source code is available [here](https://github.com/hzqst/metamod-fallguys)
+* the [ASExt plugin](https://github.com/hzqst/metamod-fallguys/tree/main/asext) and [Fall Guys plugin](https://github.com/hzqst/metamod-fallguys/tree/main/fallguys) are not binary-compatible with `metamod-p` from other sources. You should always use `metamod-p` from [metamod-fallguys](https://github.com/hzqst/metamod-fallguys/tree/main/metamod) to load those plugins.
 
-* `addons` (metamod) and `liblist.gam` must be installed into `Sven Co-op/svencoop` rather than `Sven Co-op/svencoop_addons` or `Sven Co-op/svencoop_download`.
+* Other plugins like [amxmodx](https://github.com/alliedmodders/amxmodx) are binary-compatible with [metamod-fallguys](https://github.com/hzqst/metamod-fallguys/tree/main/metamod). You don't have to re-compile them.
 
 # Credits
 
-Textures, sprites and sounds credit to [Fall Guys: Ultimate Knockout](https://fallguys.com/)
+Textures, models, sprites and sounds credit to [Fall Guys: Ultimate Knockout](https://fallguys.com/)
 
 The skybox credits to [mg_falling_guy from CSGO workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=2428655418)
