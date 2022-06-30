@@ -491,7 +491,7 @@ class CEnvPhysicModel : ScriptBaseEntity
 
 		if((self.pev.spawnflags & SF_ENV_PHYSMODEL_BOX) == SF_ENV_PHYSMODEL_BOX)
 		{
-			g_EntityFuncs.CreatePhysicBox(self.edict(),
+			/*g_EntityFuncs.CreatePhysicBox(self.edict(),
 			m_flMass,
 			m_flLinearFriction,
 			m_flRollingFriction,
@@ -500,22 +500,22 @@ class CEnvPhysicModel : ScriptBaseEntity
 			m_flCCDThreshold,
 			((self.pev.spawnflags & SF_ENV_PHYSMODEL_PUSHABLE) == SF_ENV_PHYSMODEL_PUSHABLE) ? true : false);
 
-			SetTouch(TouchFunction(this.PhysicTouch));
+			SetTouch(TouchFunction(this.PhysicTouch));*/
 		}
 
 		if(self.pev.fuser1 > 0 || self.pev.fuser2 > 0 || self.pev.fuser3 > 0)
 		{
-			g_EntityFuncs.SetEntityLevelOfDetail(self.edict(), 
+			/*g_EntityFuncs.SetEntityLevelOfDetail(self.edict(), 
 				LOD_BODY,
 				0, 0, //LoD 0
 				self.pev.iuser1, 0, self.pev.fuser1, //LoD 1
 				self.pev.iuser2, 0, self.pev.fuser2, //LoD 2
 				self.pev.iuser3, 0, self.pev.fuser3 //LoD 3
-			);
+			);*/
 		}
 	}
 
-	void PhysicTouch( CBaseEntity@ pOther )
+	/*void PhysicTouch( CBaseEntity@ pOther )
 	{
 		if(pOther.IsPlayer() && pOther.IsAlive())
 		{
@@ -539,7 +539,7 @@ class CEnvPhysicModel : ScriptBaseEntity
 				}
 			}
 		}
-	}
+	}*/
 }
 
 class CEnvStudioModel : ScriptBaseEntity
@@ -577,13 +577,13 @@ class CEnvStudioModel : ScriptBaseEntity
 
 		if(self.pev.fuser1 > 0 || self.pev.fuser2 > 0 || self.pev.fuser3 > 0)
 		{
-			g_EntityFuncs.SetEntityLevelOfDetail(self.edict(), 
+			/*g_EntityFuncs.SetEntityLevelOfDetail(self.edict(), 
 				LOD_BODY,
 				0, 0, //LoD 0
 				self.pev.iuser1, 0, self.pev.fuser1, //LoD 1
 				self.pev.iuser2, 0, self.pev.fuser2, //LoD 2
 				self.pev.iuser3, 0, self.pev.fuser3 //LoD 3
-			);
+			);*/
 		}
 	}
 
@@ -866,8 +866,8 @@ class CFuncRotatingFg : ScriptBaseEntity
 			SetThink(ThinkFunction(this.Rotate));
 		}
 
-		if(m_bIsSuperPusher)
-			g_EntityFuncs.SetEntitySuperPusher(self.edict(), true);
+		//if(m_bIsSuperPusher)
+		//	g_EntityFuncs.SetEntitySuperPusher(self.edict(), true);
 	}
 
 	bool KeyValue( const string & in szKey, const string & in szValue )
@@ -1198,7 +1198,7 @@ class CFuncRotatingFg : ScriptBaseEntity
 			return;
 
 		//This is not PM code, velocity works
-		Vector vecSuperPusherPushingVector;
+		/*Vector vecSuperPusherPushingVector;
 		if(g_EntityFuncs.GetCurrentSuperPusher(vecSuperPusherPushingVector) is self.edict())
 		{
 			if(m_flPushForce > 0)
@@ -1252,7 +1252,7 @@ class CFuncRotatingFg : ScriptBaseEntity
 				pOther.pev.velocity = vOut * flForce;
 			}
 			return;
-		}
+		}*/
 
 		//PM code, velocity not works
 		if((self.pev.spawnflags & (SF_BRUSH_ROTATE_Z_AXIS | SF_BRUSH_ROTATE_X_AXIS)) == 0)
@@ -1671,8 +1671,8 @@ class CFuncTrainFg : ScriptBaseEntity
 
 		m_activated = false;
 
-		if(m_bIsSuperPusher)
-			g_EntityFuncs.SetEntitySuperPusher(self.edict(), true);
+		//if(m_bIsSuperPusher)
+		//	g_EntityFuncs.SetEntitySuperPusher(self.edict(), true);
 	}
 
 	void Touch( CBaseEntity@ pOther )
@@ -1684,7 +1684,7 @@ class CFuncTrainFg : ScriptBaseEntity
 			return;
 
 		//not PM code, velocity works
-		Vector vecSuperPusherPushingVector;
+		/*Vector vecSuperPusherPushingVector;
 		if(g_EntityFuncs.GetCurrentSuperPusher(vecSuperPusherPushingVector) is self.edict())
 		{
 			if(m_flPushForce > 0.0)
@@ -1718,7 +1718,7 @@ class CFuncTrainFg : ScriptBaseEntity
 			}
 
 			return;
-		}
+		}*/
 
 		//PM code
 		if(m_flBounceForce > 0)
@@ -2073,8 +2073,8 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 		SetThink( ThinkFunction( this.Find ) );
 		Precache();
 
-		if(m_bIsSuperPusher)
-			g_EntityFuncs.SetEntitySuperPusher(self.edict(), true);
+		//if(m_bIsSuperPusher)
+		//	g_EntityFuncs.SetEntitySuperPusher(self.edict(), true);
 	}
 
 	bool KeyValue( const string & in szKey, const string & in szValue )
@@ -2238,7 +2238,7 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 			return;
 
 		//Not PM code
-		Vector vecSuperPusherPushingVector;
+		/*Vector vecSuperPusherPushingVector;
 		if(g_EntityFuncs.GetCurrentSuperPusher(vecSuperPusherPushingVector) is self.edict())
 		{
 			if(m_flPushForce > 0)
@@ -2264,7 +2264,7 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 				if(pOther.pev.velocity.z < m_flUpForce)
 					pOther.pev.velocity.z = m_flUpForce;
 			}
-		}
+		}*/
 	}
 
 	void Blocked( CBaseEntity@ pOther )
@@ -3408,8 +3408,8 @@ class CFuncPendulum2 : ScriptBaseEntity
 			SetThink(ThinkFunction(this.SUB_CallUseToggle));
 		}
 
-		if(m_bIsSuperPusher)
-			g_EntityFuncs.SetEntitySuperPusher(self.edict(), true);
+		//if(m_bIsSuperPusher)
+		//	g_EntityFuncs.SetEntitySuperPusher(self.edict(), true);
 	}
 
 	bool KeyValue( const string & in szKey, const string & in szValue )
@@ -3587,7 +3587,7 @@ class CFuncPendulum2 : ScriptBaseEntity
 			return;
 
 		//Not PM code, velocity works
-		Vector vecSuperPusherPushingVector;
+		/*Vector vecSuperPusherPushingVector;
 		if(g_EntityFuncs.GetCurrentSuperPusher(vecSuperPusherPushingVector) is self.edict())
 		{
 			if(m_flPushForce > 0.0)
@@ -3618,7 +3618,7 @@ class CFuncPendulum2 : ScriptBaseEntity
 			}
 
 			return;
-		}
+		}*/
 
 		//PM code, velocity don't work
 		if(m_flBounceForce > 0)
@@ -7712,10 +7712,8 @@ class CMonsterRhino : ScriptBaseMonsterEntity
 	}
 }
 
-HookReturnCode PlayerTouchImpact( CBasePlayer@ pPlayer, CBaseEntity@ pOther )
+/*HookReturnCode PlayerTouchImpact( CBasePlayer@ pPlayer, CBaseEntity@ pOther )
 {
-	//g_Game.AlertMessage( at_console, "PlayerTouchImpact %1 touches %2 with impact velocity %3", string(pPlayer.pev.netname), string(pOther.pev.targetname), pPlayer.pev.velocity.Length() );
-
 	if(pOther.IsPlayer() && pOther.IsAlive())
 	{
 		Vector vDiff = pOther.pev.origin - pPlayer.pev.origin;
@@ -7745,90 +7743,7 @@ HookReturnCode PlayerTouchImpact( CBasePlayer@ pPlayer, CBaseEntity@ pOther )
 	}
 
     return HOOK_CONTINUE;
-}
-
-HookReturnCode PlayerAddToFullPack( entity_state_t@ state, int e, edict_t @ent, edict_t@ host, int hostflags, int player, uint& out uiFlags )
-{
-	/*if(ent.vars.iuser4 == g_iLodStudioModelMagicNumber)
-	{
-		if(ent.vars.fuser1 > 0 && ent.vars.fuser2 > 0 && ent.vars.fuser3 > 0)
-		{
-			float distance = (ent.vars.origin - g_EngineFuncs.GetViewEntity(host).vars.origin).Length();
-
-			state.body = 0;
-
-			if(distance > ent.vars.fuser3){
-				state.body = ent.vars.iuser3;
-			}
-			else if(distance > ent.vars.fuser2){
-				state.body = ent.vars.iuser2;
-			}
-			else if(distance > ent.vars.fuser1){
-				state.body = ent.vars.iuser1;
-			}
-		}
-	}*/
-
-	//Arrow Sprite
-	if(ent.vars.iuser4 == g_iPlayerArrowSpriteMagicNumber)
-	{
-		if(ent.vars.iuser1 != g_EngineFuncs.IndexOfEdict(host))
-		{
-			//Hide other player's arrows
-			uiFlags |= 1;
-		}
-		else
-		{
-			edict_t @viewEnt = g_EngineFuncs.GetViewEntity(host);
-			if(@viewEnt == @host)
-			{
-				float distance = (ent.vars.origin - viewEnt.vars.origin).Length();
-
-				if(distance > 1000.0)
-				{
-					state.modelindex = g_iPlayerArrowSprite2ModelIndex;
-					state.scale = 0.75;
-				}
-				else if(distance > 300.0)
-				{
-					state.modelindex = g_iPlayerArrowSprite2ModelIndex;
-					state.scale = 0.15 + 0.65 * (distance - 300.0) / 700.0;
-				}
-				else
-				{
-					state.scale = 0.15;
-				}
-			}
-			else
-			{
-				//trigger_camera or something
-
-				float distance = (ent.vars.origin - viewEnt.vars.origin).Length();
-
-				if(distance > 1000.0)
-				{
-					state.modelindex = g_iPlayerArrowSprite2ModelIndex;
-					state.scale = 0.75;
-				}
-				else if(distance > 600.0)
-				{
-					state.modelindex = g_iPlayerArrowSprite2ModelIndex;
-					state.scale = 0.15 + 0.6 * (distance - 300.0) / 700.0;
-				}
-				else if(distance > 300.0)
-				{
-					state.scale = 0.15 + 0.6 * (distance - 300.0) / 700.0;
-				}
-				else
-				{
-					state.scale = 0.15;
-				}
-			}
-		}
-	}
-
-    return HOOK_HANDLED;
-}
+}*/
 
 HookReturnCode ClientDisconnect(CBasePlayer@ pPlayer)
 {
@@ -7971,28 +7886,25 @@ void PlayerShowArrow(CBasePlayer@ pPlayer, int playerIndex)
 	if(eHandle.IsValid())
 		return;
 
-	CBaseEntity@ pEntity = g_EntityFuncs.Create("info_target", pPlayer.pev.origin, pPlayer.pev.angles, false);
+	/*CBaseEntity@ pEntity = g_EntityFuncs.Create("info_target", pPlayer.pev.origin, pPlayer.pev.angles, false);
 	g_EntityFuncs.SetModel(pEntity, g_szPlayerArrowSprite);
 	pEntity.pev.sequence = 0;
 	pEntity.pev.frame = 0;
 	pEntity.pev.scale = 0.15;
 	@pEntity.pev.aiment = pPlayer.edict();
 	pEntity.pev.movetype = MOVETYPE_FOLLOW;
-	pEntity.pev.rendermode = kRenderNormal;
+	pEntity.pev.rendermode = kRenderNormal;*/
 
-	g_EntityFuncs.SetEntityPartialViewer(pEntity.edict(), (1 << (pPlayer.entindex() - 1)) );
+	/*g_EntityFuncs.SetEntityPartialViewer(pEntity.edict(), (1 << (pPlayer.entindex() - 1)) );
 	g_EntityFuncs.SetEntityLevelOfDetail(pEntity.edict(),
 		LOD_MODELINDEX | LOD_SCALE_INTERP, //modelindex LoD
 		g_iPlayerArrowSpriteModelIndex, 0.15,      //LoD 0
 		g_iPlayerArrowSpriteModelIndex, 0.15, 300, //Lod 1
 		g_iPlayerArrowSprite2ModelIndex, 0.75, 700, //Lod 2
 		g_iPlayerArrowSprite2ModelIndex, 0.75, 1000 //Lod 3
-	);
+	);*/
 
-	//pEntity.pev.iuser4 = g_iPlayerArrowSpriteMagicNumber;
-	//pEntity.pev.iuser1 = pPlayer.entindex();
-
-	g_ArrayArrowEntityPlayer[pPlayer.entindex()] = EHandle(@pEntity);
+	//g_ArrayArrowEntityPlayer[pPlayer.entindex()] = EHandle(@pEntity);
 }
 
 void PlayerHideArrow(CBasePlayer@ pPlayer, int playerIndex)
@@ -8075,14 +7987,14 @@ HookReturnCode PlayerPostThink(CBasePlayer@ pPlayer)
 	PlayerStopBlock(pPlayer, playerIndex);
 	PlayerStopFreeze(pPlayer, playerIndex);
 
-	if(pPlayer.IsAlive())
+	/*if(pPlayer.IsAlive())
 	{
 		PlayerShowArrow(pPlayer, playerIndex);
 	}
 	else
 	{
 		PlayerHideArrow(pPlayer, playerIndex);
-	}
+	}*/
 
 	if(pPlayer.IsAlive())
 	{
@@ -8110,6 +8022,7 @@ HookReturnCode PlayerPostThink(CBasePlayer@ pPlayer)
     return HOOK_CONTINUE;
 }
 
+/*
 HookReturnCode PlayerPostThinkPost(CBasePlayer@ pPlayer)
 {
 	if(pPlayer is null || !pPlayer.IsConnected() || !pPlayer.IsAlive())
@@ -8123,6 +8036,7 @@ HookReturnCode PlayerPostThinkPost(CBasePlayer@ pPlayer)
 
     return HOOK_CONTINUE;
 }
+*/
 
 Vector GetViewDir(CBaseEntity@ plr) {
 	Vector angles = plr.pev.v_angle;
@@ -8298,8 +8212,8 @@ void MapInit()
 	g_CustomEntityFuncs.RegisterCustomEntity( "CTriggerFindBrush", "trigger_findbrush" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CMonsterRhino", "monster_rhino" );
 
-	g_iPlayerArrowSpriteModelIndex = g_Game.PrecacheModel( g_szPlayerArrowSprite );
-	g_iPlayerArrowSprite2ModelIndex = g_Game.PrecacheModel( g_szPlayerArrowSprite2 );
+	//g_iPlayerArrowSpriteModelIndex = g_Game.PrecacheModel( g_szPlayerArrowSprite );
+	//g_iPlayerArrowSprite2ModelIndex = g_Game.PrecacheModel( g_szPlayerArrowSprite2 );
 
 	g_SoundSystem.PrecacheSound( g_szPlayerGrabSound );
 	g_SoundSystem.PrecacheSound( g_szPlayerGrabReleaseSound );
@@ -8353,14 +8267,13 @@ void MapInit()
 	
 	@monster_rhino_schedules = @scheds;
 
-    g_Hooks.RegisterHook(Hooks::Player::PlayerTouchImpact, @PlayerTouchImpact);
-	//g_Hooks.RegisterHook(Hooks::Player::PlayerAddToFullPack, @PlayerAddToFullPack);
+    //g_Hooks.RegisterHook(Hooks::Player::PlayerTouchImpact, @PlayerTouchImpact);
 	g_Hooks.RegisterHook(Hooks::Player::ClientDisconnect, @ClientDisconnect);
 	g_Hooks.RegisterHook(Hooks::Player::PlayerSpawn, @PlayerSpawn);
     g_Hooks.RegisterHook(Hooks::Player::PlayerTakeDamage, @PlayerTakeDamage);
     g_Hooks.RegisterHook(Hooks::Player::PlayerPreThink, @PlayerPreThink);
     g_Hooks.RegisterHook(Hooks::Player::PlayerPostThink, @PlayerPostThink);
-    g_Hooks.RegisterHook(Hooks::Player::PlayerPostThinkPost, @PlayerPostThinkPost);
+    //g_Hooks.RegisterHook(Hooks::Player::PlayerPostThinkPost, @PlayerPostThinkPost);
     g_Hooks.RegisterHook(Hooks::Player::PlayerUse, @PlayerUse);
 
 }
