@@ -5942,7 +5942,7 @@ class CTriggerEntityItor3 : ScriptBaseEntity
 					continue;
 
 				if(m_iTriggerState == -1){
-					pEntity.SUB_Remove();
+					g_EntityFuncs.Remove(pEntity);
 				} else {
 					pEntity.Use( pActivator, self, USE_TYPE(m_iTriggerState), m_flTriggerValue );
 				}
@@ -5955,7 +5955,7 @@ class CTriggerEntityItor3 : ScriptBaseEntity
 					continue;
 
 				if(m_iTriggerState == -1){
-					pEntity.SUB_Remove();
+					g_EntityFuncs.Remove(pEntity);
 				} else {
 					pEntity.Use( pActivator, self, USE_TYPE(m_iTriggerState), m_flTriggerValue );
 				}
@@ -5968,7 +5968,7 @@ class CTriggerEntityItor3 : ScriptBaseEntity
 					continue;
 
 				if(m_iTriggerState == -1){
-					pEntity.SUB_Remove();
+					g_EntityFuncs.Remove(pEntity);
 				} else {
 					pEntity.Use( pActivator, self, USE_TYPE(m_iTriggerState), m_flTriggerValue );
 				}
@@ -6898,7 +6898,7 @@ class CTriggerSortPanel : ScriptBaseEntity
 		CBaseEntity@ pEntity = null;
 		while((@pEntity = g_EntityFuncs.FindEntityByTargetname(pEntity, "script_load_error")) !is null)
 		{
-			pEntity.SUB_Remove();
+			g_EntityFuncs.Remove(pEntity);
 		}
 	}
 
@@ -8002,7 +8002,7 @@ void PlayerHideArrow(CBasePlayer@ pPlayer, int playerIndex)
 	if(!eHandle.IsValid())
 		return;
 
-	eHandle.GetEntity().SUB_Remove();
+	g_EntityFuncs.Remove(eHandle.GetEntity());
 }
 
 void PlayerShowHat(CBasePlayer@ pPlayer, int playerIndex, string szHatModel)
@@ -8030,7 +8030,7 @@ void PlayerHideHat(CBasePlayer@ pPlayer, int playerIndex)
 	if(!eHandle.IsValid())
 		return;
 
-	eHandle.GetEntity().SUB_Remove();
+	g_EntityFuncs.Remove(eHandle.GetEntity());
 }
 
 HookReturnCode PlayerPreThink(CBasePlayer@ pPlayer, uint& out uiFlags)
