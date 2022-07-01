@@ -7255,6 +7255,8 @@ class CMonsterRhino : ScriptBaseMonsterEntity
 		self.m_FormattedName		= "Rhino";
 
 		self.MonsterInit();
+
+		self.pev.takedamage = DAMAGE_NO;
 	}
 	
 	int	Classify()
@@ -7307,6 +7309,11 @@ class CMonsterRhino : ScriptBaseMonsterEntity
 
 	int TakeDamage( entvars_t@ pevInflictor, entvars_t@ pevAttacker, float flDamage, int bitsDamageType)
 	{	
+		return 0;
+	}
+
+	float GetPointsForDamage(float flDamage)
+	{
 		return 0;
 	}
 	
@@ -7393,7 +7400,7 @@ class CMonsterRhino : ScriptBaseMonsterEntity
 		
 		Vector vecTarget = vecSrc + dir * 120.0;
 
-		vecTarget.z += 50;
+		vecTarget.z += 60;
 
 		CBaseEntity@ pEntity = null;
 		
@@ -7404,8 +7411,8 @@ class CMonsterRhino : ScriptBaseMonsterEntity
 			{
 				pPlayer.TakeDamage( self.pev, self.pev, 1, DMG_SLASH );
 
-				pPlayer.pev.velocity = pPlayer.pev.velocity + g_Engine.v_forward * self.pev.frags * 0.6;
-				pPlayer.pev.velocity = pPlayer.pev.velocity + g_Engine.v_up * self.pev.frags * 0.4;
+				pPlayer.pev.velocity = pPlayer.pev.velocity + g_Engine.v_forward * self.pev.frags * 1.2;
+				pPlayer.pev.velocity = pPlayer.pev.velocity + g_Engine.v_up * self.pev.frags * 0.8;
 			}
 		}
 
@@ -7850,6 +7857,8 @@ HookReturnCode PlayerSpawn(CBasePlayer@ pPlayer)
 	message.End();
 
 	pPlayer.SetMaxSpeed(c_PlayerDefaultMaxSpeed);
+	pPlayer.pev.solid = SOLID_SLIDEBOX;
+
 
     return HOOK_CONTINUE;
 }
@@ -8192,7 +8201,7 @@ HookReturnCode PlayerUse(CBasePlayer@ pPlayer, uint& out uiFlags)
 
 	bool bGrabbing = false;
 
-	if ((pPlayer.pev.button & IN_USE) == IN_USE && pPlayer.GetMaxSpeedOverride() > 0)
+	if ((pPlayer.pev.button & IN_USE) == IN_USE && pPlayer.GetMaxSpeedOverride() != 0)
 	{
 		bGrabbing = PlayerGrab(pPlayer);
 	}
