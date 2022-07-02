@@ -4,6 +4,7 @@ const float c_PlayerImpactPlayer_VelocityTransferEfficiency = 0.75;
 
 const float c_PlayerGrab_Range = 48.0;
 const float c_PlayerGrab_Velocity = 2500.0;
+
 const float c_PlayerDefaultMaxSpeed = 270.0;
 
 const int LOD_BODY = 1;
@@ -317,6 +318,7 @@ class CEnvHexagonTile : ScriptBaseEntity
 
 		self.pev.solid = SOLID_BBOX;
 		self.pev.movetype = MOVETYPE_NOCLIP;
+		self.pev.effects |= EF_NOINTERP;
 
 		g_EntityFuncs.SetModel( self, self.pev.model );
 
@@ -334,7 +336,16 @@ class CEnvHexagonTile : ScriptBaseEntity
 		m_TileChangeState[1] = 0; 
 		m_TileChangeState[2] = 0; 
 		m_TileChangeState[3] = 0; 
-		m_TileChangeState[4] = 0; 
+		m_TileChangeState[4] = 0;
+
+		if((self.pev.spawnflags & 1) == 1)
+		{
+			g_EntityFuncs.CreateSolidOptimizer(self.edict(), 0, 128.0);
+			g_EntityFuncs.CreateSolidOptimizer(self.edict(), 1, 128.0);
+			g_EntityFuncs.CreateSolidOptimizer(self.edict(), 2, 128.0);
+			g_EntityFuncs.CreateSolidOptimizer(self.edict(), 3, 128.0);
+			g_EntityFuncs.CreateSolidOptimizer(self.edict(), 4, 128.0);
+		}
 	}
 
 	void Touch( CBaseEntity@ pOther )
@@ -344,6 +355,7 @@ class CEnvHexagonTile : ScriptBaseEntity
 			if((pOther.pev.flags & FL_ONGROUND) == FL_ONGROUND && (pOther.pev.groundentity is self.edict() ))
 			{
 				CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pOther);
+
 				if(pPlayer.GetMaxSpeedOverride() == 0)
 					return;
 
@@ -377,6 +389,7 @@ class CEnvHexagonTile : ScriptBaseEntity
 
 					if(self.pev.sequence == 31){
 						self.pev.effects |= EF_NODRAW;
+						self.pev.solid = SOLID_NOT;
 					}
 				}
 				else
@@ -1929,7 +1942,7 @@ class CFuncTrainFg : ScriptBaseEntity
 		if (m_pCurrentTarget !is null && m_pCurrentTarget.pev.speed != 0)
 		{
 			self.pev.speed = m_pCurrentTarget.pev.speed;
-			g_Game.AlertMessage(at_aiconsole, "Train %1 speed to %2\n", string(self.pev.targetname), self.pev.speed);
+			//g_Game.AlertMessage(at_aiconsole, "Train %1 speed to %2\n", string(self.pev.targetname), self.pev.speed);
 		}
 
 		@m_pCurrentTarget = @pTarget;
@@ -2018,7 +2031,7 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 
 	void Restart()
 	{
-		g_Game.AlertMessage( at_console, "TRACKTRAIN (%1) restart", string(self.pev.targetname) );
+		//g_Game.AlertMessage( at_console, "TRACKTRAIN (%1) restart", string(self.pev.targetname) );
 
 		self.pev.speed = 0;
 		self.pev.velocity = g_vecZero;
@@ -2225,7 +2238,7 @@ class CFuncTrackTrainFg : ScriptBaseEntity
 
 			Next();
 
-			g_Game.AlertMessage(at_aiconsole, "TRACKTRAIN (%1): change speed to %2\n", string(self.pev.targetname), self.pev.speed);
+			//g_Game.AlertMessage(at_aiconsole, "TRACKTRAIN (%1): change speed to %2\n", string(self.pev.targetname), self.pev.speed);
 		}
 	}
 
@@ -4558,8 +4571,10 @@ class CTriggerHUDSprite : ScriptBaseEntity
 				if(pActivator !is null && pActivator.IsPlayer() && pActivator.IsNetClient())
 				{
 					CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pActivator);
+
+					//g_Game.AlertMessage( at_console, "Activator is %1 %2 %3 %4 %5\n", pActivator.pev.netname, pActivator.pev.targetname, m_szText, flValue, m_flHoldTime);
 					
-					if((self.pev.spawnflags & 8)== 8){
+					if((self.pev.spawnflags & 8) == 8){
 						SendText(pPlayer, m_szText + int(flValue), m_flHoldTime);
 					} else {
 						SendText(pPlayer, m_szText, m_flHoldTime);
@@ -4572,7 +4587,7 @@ class CTriggerHUDSprite : ScriptBaseEntity
 						CBasePlayer@ pPlayer = g_PlayerFuncs.FindPlayerByIndex(i);
 						if(pPlayer !is null && pPlayer.IsConnected())
 						{
-							if((self.pev.spawnflags & 8)== 8){
+							if((self.pev.spawnflags & 8) == 8){
 								SendText(pPlayer, m_szText + int(flValue), m_flHoldTime);
 							} else {
 								SendText(pPlayer, m_szText, m_flHoldTime);
@@ -4753,7 +4768,9 @@ class CTriggerHUDCountdown : ScriptBaseEntity
 			//Update countdown on the fly?
 			if(int(flValue) < m_nCurrentCount)
 			{
-				m_nCurrentCount = m_nCountNum;
+				//g_Game.AlertMessage( at_console, "Reset Countdown to %1\n", int(flValue) );
+				
+				m_nCurrentCount = int(flValue);
 				m_nCurrentAccum = 0;
 				Think();
 			}
@@ -6539,7 +6556,7 @@ class CTriggerQualifier : ScriptBaseEntity
 
 	float m_flGiveFragsFirst = 0;
 	float m_flGiveFragsTopFifty = 0;
-	float m_flGiveFrags = 100;
+	float m_flGiveFrags = 0;
 
 	string m_szGiveFragsFirstEntity = "";
 	string m_szGiveFragsTopFiftyEntity = "";
@@ -6786,11 +6803,13 @@ class CTriggerQualifier : ScriptBaseEntity
 				if(pActivator !is null && pActivator.IsPlayer() && pActivator.IsNetClient())
 				{
 					CBasePlayer@ pPlayer = cast<CBasePlayer@>(@pActivator);
-					
+
+					//g_Game.AlertMessage( at_console, "Activator is %1 %2 %3\n", pActivator.pev.netname, pActivator.pev.targetname, flGiveFrags);
+
 					pPlayer.pev.frags += flGiveFrags;
 
 					if(!szGiveFragsEntity.IsEmpty())
-						g_EntityFuncs.FireTargets( szGiveFragsEntity, pPlayer, self, USE_TOGGLE, flGiveFrags );
+						g_EntityFuncs.FireTargets( szGiveFragsEntity, pActivator, self, USE_TOGGLE, flGiveFrags );
 
 					if((self.pev.spawnflags & 4) == 4)
 					{
@@ -6815,6 +6834,8 @@ class CTriggerQualifier : ScriptBaseEntity
 						if(pPlayer !is null && pPlayer.IsConnected())
 						{
 							pPlayer.pev.frags += flGiveFrags;
+
+							//g_Game.AlertMessage( at_console, "pPlayer is %1 %2 %3\n", pPlayer.pev.netname, pPlayer.pev.targetname, flGiveFrags);
 
 							if(!szGiveFragsEntity.IsEmpty())
 								g_EntityFuncs.FireTargets( szGiveFragsEntity, pPlayer, self, USE_TOGGLE, flGiveFrags );
@@ -8257,6 +8278,7 @@ const bool doCommand(CBasePlayer@ plr, const CCommand@ args, bool inConsole) {
   }
   return false;
 }
+
 void consoleCmd(const CCommand@ args) {
   CBasePlayer@ plr = g_ConCommandSystem.GetCurrentPlayer();
   doCommand(plr, args, true);

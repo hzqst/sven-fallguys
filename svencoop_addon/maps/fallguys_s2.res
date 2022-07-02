@@ -92,6 +92,7 @@ sprites/fallguys/introgold.spr
 sprites/fallguys/introlightgreen.spr
 sprites/fallguys/introroxo.spr
 sprites/fallguys/medalbronze.spr
+sprites/fallguys/medalelim.spr
 sprites/fallguys/medalgold.spr
 sprites/fallguys/medalsilver.spr
 sprites/fallguys/playerarrow.spr
