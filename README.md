@@ -1,6 +1,22 @@
 # sven-fallguys
 
-# Fall Guys in Sven Co-op - Season 2
+# Fall Guys in Sven Co-op - Season 2 - without metamod
+
+* Without metamod you will :
+
+1. not be able to push other guys
+
+2. not be able to be shoved by solid brush entites like rotating, balls and doors
+
+3. sometimes get blocked by by solid brush entites like rotating, balls and doors
+
+4. not be able to gain fps from server-side Level of Detail, all models are rendered at lowest quality
+
+5. not be able to gain fps from Solid-Optimizer, you might get low fps in HEX-A-GONE
+
+6. not be able to see localplayer indicator arrow sprite
+
+7. not be able to push debris of doors in DOOR DASH
 
 ### 12 minigames are available now !
 
