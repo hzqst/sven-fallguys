@@ -128,6 +128,8 @@
 
 ![](/img/end.png)
 
+![](/img/win.png)
+
 # Requirement
 
 1. Sven Co-op 5.25 or later
