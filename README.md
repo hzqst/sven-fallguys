@@ -1,22 +1,6 @@
 # sven-fallguys
 
-# Fall Guys in Sven Co-op - Season 2 - without metamod
-
-* Without metamod you will :
-
-1. not be able to push other guys
-
-2. not be able to be shoved by solid brush entites like rotating, balls and doors
-
-3. sometimes get blocked by by solid brush entites like rotating, balls and doors
-
-4. not be able to gain fps from server-side Level of Detail, all models are rendered at lowest quality
-
-5. not be able to gain fps from Solid-Optimizer, you might get low fps in HEX-A-GONE
-
-6. not be able to see localplayer indicator arrow sprite
-
-7. not be able to push debris of doors in DOOR DASH
+# Fall Guys in Sven Co-op - Season 2 - with metamod
 
 ### 12 minigames are available now !
 
@@ -108,7 +92,7 @@
 
 * All survivors gain 150 poionts!
 
-![](/img/stompinground.png)
+![](/img/rhino.png)
 
 ## DOOR DASH
 
@@ -118,6 +102,8 @@
 
 * The champion gains 150 points, the top 50% gains 125 points, otherwise gain 100 points!
 
+![](/img/doordash.png)
+
 ## TIP TOE
 
 * Race
@@ -126,6 +112,8 @@
 
 * The champion gains 150 points, the top 50% gains 125 points, otherwise gain 100 points!
 
+![](/img/tiptoe.png)
+
 ## GATE CRASH
 
 * Race
@@ -133,6 +121,8 @@
 * Avoid the moving doors and race to the finish line before timeout!
 
 * The champion gains 150 points, the top 50% gains 125 points, otherwise gain 100 points!
+
+![](/img/gatecrash.png)
 
 ## Eliminated and Victory Board
 
