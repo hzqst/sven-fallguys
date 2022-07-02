@@ -1,6 +1,6 @@
 # sven-fallguys
 
-# Fall Guys in Sven Co-op - Season 2
+# Fall Guys in Sven Co-op - Season 2 - without metamod
 
 ### 12 minigames are available now !
 
@@ -92,7 +92,7 @@
 
 * All survivors gain 150 poionts!
 
-![](/img/stompinground.png)
+![](/img/rhino.png)
 
 ## DOOR DASH
 
@@ -102,6 +102,8 @@
 
 * The champion gains 150 points, the top 50% gains 125 points, otherwise gain 100 points!
 
+![](/img/doordash.png)
+
 ## TIP TOE
 
 * Race
@@ -109,6 +111,8 @@
 * Avoid the fake tiles and find the hidden path to reach the finish line before timeout!
 
 * The champion gains 150 points, the top 50% gains 125 points, otherwise gain 100 points!
+
+![](/img/tiptoe.png)
 
 ## GATE CRASH
 
@@ -118,9 +122,13 @@
 
 * The champion gains 150 points, the top 50% gains 125 points, otherwise gain 100 points!
 
+![](/img/gatecrash.png)
+
 ## Eliminated and Victory Board
 
 ![](/img/end.png)
+
+![](/img/win.png)
 
 # Requirement
 
