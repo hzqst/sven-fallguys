@@ -318,7 +318,7 @@ class CEnvHexagonTile : ScriptBaseEntity
 
 		self.pev.solid = SOLID_BBOX;
 		self.pev.movetype = MOVETYPE_NOCLIP;
-		self.pev.effects |= EF_NOINTERP;
+		//self.pev.effects |= EF_NOINTERP;
 
 		g_EntityFuncs.SetModel( self, self.pev.model );
 
@@ -340,11 +340,14 @@ class CEnvHexagonTile : ScriptBaseEntity
 
 		if((self.pev.spawnflags & 1) == 1)
 		{
-			g_EntityFuncs.CreateSolidOptimizer(self.edict(), 0, 128.0);
-			g_EntityFuncs.CreateSolidOptimizer(self.edict(), 1, 128.0);
-			g_EntityFuncs.CreateSolidOptimizer(self.edict(), 2, 128.0);
-			g_EntityFuncs.CreateSolidOptimizer(self.edict(), 3, 128.0);
-			g_EntityFuncs.CreateSolidOptimizer(self.edict(), 4, 128.0);
+			Vector halfextent = Vector(128.0, 128.0, 512.0);
+			Vector halfextent2 = Vector(256.0, 256.0, 512.0);
+
+			g_EntityFuncs.CreateSolidOptimizer(self.edict(), 0, halfextent, halfextent2);
+			g_EntityFuncs.CreateSolidOptimizer(self.edict(), 1, halfextent, halfextent2);
+			g_EntityFuncs.CreateSolidOptimizer(self.edict(), 2, halfextent, halfextent2);
+			g_EntityFuncs.CreateSolidOptimizer(self.edict(), 3, halfextent, halfextent2);
+			g_EntityFuncs.CreateSolidOptimizer(self.edict(), 4, halfextent, halfextent2);
 		}
 	}
 
@@ -4818,7 +4821,7 @@ class CTriggerSpectator : ScriptBaseEntity
 			pPlayer.pev.gamestate = 1;
 			pPlayer.pev.effects |= EF_NODRAW;
 			pPlayer.GetObserver().StartObserver( pPlayer.pev.origin, pPlayer.pev.angles, false );
-			pPlayer.GetObserver().SetMode(OBS_ROAMING);
+			pPlayer.GetObserver().SetMode(OBS_CHASE_LOCKED);
 			pPlayer.GetObserver().SetObserverModeControlEnabled(true);
 			pPlayer.SetMaxSpeedOverride( -1 );
 		}
@@ -6821,7 +6824,7 @@ class CTriggerQualifier : ScriptBaseEntity
 						pPlayer.pev.gamestate = 1;
 						pPlayer.pev.effects |= EF_NODRAW;
 						pPlayer.GetObserver().StartObserver( pPlayer.pev.origin, pPlayer.pev.angles, false );
-						pPlayer.GetObserver().SetMode(OBS_ROAMING);
+						pPlayer.GetObserver().SetMode(OBS_CHASE_LOCKED);
 						pPlayer.GetObserver().SetObserverModeControlEnabled(true);
 						pPlayer.SetMaxSpeedOverride( -1 );
 					}
@@ -6850,7 +6853,7 @@ class CTriggerQualifier : ScriptBaseEntity
 								pPlayer.pev.gamestate = 1;
 								pPlayer.pev.effects |= EF_NODRAW;
 								pPlayer.GetObserver().StartObserver( pPlayer.pev.origin, pPlayer.pev.angles, false );
-								pPlayer.GetObserver().SetMode(OBS_ROAMING);
+								pPlayer.GetObserver().SetMode(OBS_CHASE_LOCKED);
 								pPlayer.GetObserver().SetObserverModeControlEnabled(true);
 								pPlayer.SetMaxSpeedOverride( -1 );
 							}
@@ -6921,6 +6924,13 @@ class CTriggerSortPanel : ScriptBaseEntity
 		{
 			g_EntityFuncs.Remove(pEntity);
 		}
+
+		//testtesttset
+		/*@pEntity = null;
+		while((@pEntity = g_EntityFuncs.FindEntityByTargetname(pEntity, "ff_checkend1")) !is null)
+		{
+			g_EntityFuncs.Remove(pEntity);
+		}*/
 	}
 
 	void SortPanels()
