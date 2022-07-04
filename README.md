@@ -22,6 +22,8 @@
 
 ### Solid-Optimizer available ! You gain more fps in HEX-A-GONE ! (METAMOD REQUIRED)
 
+### Bullet Physic Engine available ! The debris of doors in DOOR DASH will be physic-objects calculate their movements in Bullet Engine instead of GoldSrc simple hull clipping ! (METAMOD REQUIRED)
+
 # MINI GAMES
 
 ## BLOCK PARTY
