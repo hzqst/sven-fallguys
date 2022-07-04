@@ -318,7 +318,7 @@ class CEnvHexagonTile : ScriptBaseEntity
 
 		self.pev.solid = SOLID_BBOX;
 		self.pev.movetype = MOVETYPE_NOCLIP;
-		self.pev.effects |= EF_NOINTERP;
+		//self.pev.effects |= EF_NOINTERP;
 
 		g_EntityFuncs.SetModel( self, self.pev.model );
 
@@ -4809,7 +4809,7 @@ class CTriggerSpectator : ScriptBaseEntity
 			pPlayer.pev.gamestate = 1;
 			pPlayer.pev.effects |= EF_NODRAW;
 			pPlayer.GetObserver().StartObserver( pPlayer.pev.origin, pPlayer.pev.angles, false );
-			pPlayer.GetObserver().SetMode(OBS_ROAMING);
+			pPlayer.GetObserver().SetMode(OBS_CHASE_LOCKED);
 			pPlayer.GetObserver().SetObserverModeControlEnabled(true);
 			pPlayer.SetMaxSpeedOverride( -1 );
 		}
@@ -6812,7 +6812,7 @@ class CTriggerQualifier : ScriptBaseEntity
 						pPlayer.pev.gamestate = 1;
 						pPlayer.pev.effects |= EF_NODRAW;
 						pPlayer.GetObserver().StartObserver( pPlayer.pev.origin, pPlayer.pev.angles, false );
-						pPlayer.GetObserver().SetMode(OBS_ROAMING);
+						pPlayer.GetObserver().SetMode(OBS_CHASE_LOCKED);
 						pPlayer.GetObserver().SetObserverModeControlEnabled(true);
 						pPlayer.SetMaxSpeedOverride( -1 );
 					}
@@ -6841,7 +6841,7 @@ class CTriggerQualifier : ScriptBaseEntity
 								pPlayer.pev.gamestate = 1;
 								pPlayer.pev.effects |= EF_NODRAW;
 								pPlayer.GetObserver().StartObserver( pPlayer.pev.origin, pPlayer.pev.angles, false );
-								pPlayer.GetObserver().SetMode(OBS_ROAMING);
+								pPlayer.GetObserver().SetMode(OBS_CHASE_LOCKED);
 								pPlayer.GetObserver().SetObserverModeControlEnabled(true);
 								pPlayer.SetMaxSpeedOverride( -1 );
 							}
