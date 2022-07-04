@@ -8,9 +8,19 @@
 
 ### Choose number of games to play before game start !
 
-### You can push other guys by stepping towards them !
-
 ### You can grab other guys by pressing E !
+
+### You can push other guys by stepping towards them ! (METAMOD REQUIRED)
+
+### You will be knocked back for a long distance by moving / rotating objects instead of being shoved off! (METAMOD REQUIRED)
+
+### You will be pushed backward along with another guys who is trying to block you by moving / rotating objects, instead of being blocked to death ! (METAMOD REQUIRED)
+
+### Player indicator arrow available! (METAMOD REQUIRED)
+
+### Level-of-Detail available ! Render quality of models adjusted dynamically according to the distance! (METAMOD REQUIRED)
+
+### Solid-Optimizer available ! You gain more fps in HEX-A-GONE ! (METAMOD REQUIRED)
 
 # MINI GAMES
 
