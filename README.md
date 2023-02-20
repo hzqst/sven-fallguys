@@ -60,7 +60,7 @@
 
 * All survivors gain 150 poionts!
 
-![](/s3/matchfall.png)
+![](/s3/matchfruit.png)
 
 ## JUMP CLUB
 
