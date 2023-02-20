@@ -174,14 +174,9 @@
 
 ## Eliminated and Victory Board
 
+![](/s3/board.png)
+
 ![](/s3/win.png)
-
-
-## Eliminated and Victory Board
-
-![](/img/end.png)
-
-![](/img/win.png)
 
 # Requirement
 
