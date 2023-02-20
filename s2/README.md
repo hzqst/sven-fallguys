@@ -1,16 +1,10 @@
-# Fall Guys in Sven Co-op - Season 3
+# Fall Guys in Sven Co-op - Season 2
 
-## Previous build
+## Game mode
 
-[Season 2](s2/README.md)
+* Random mode : Random minigame will be chosen.
 
-[Season 1](s1/README.md)
-
-## Random mode
-
-* ON : Random minigame will be chosen.
-
-* OFF : Choose whichever the minigame you like to play.
+* Casual mode : Choose whichever the minigame you like to play.
 
 ## Games to play
 
@@ -19,7 +13,6 @@
 ## Grab
 
 * Press E to grab other players.
-
 
 # MINI GAMES
 
@@ -149,9 +142,9 @@
 
 # Installation
 
-1. Download [s3_resouces.zip]() from [Release]()
+1. Download [s2_resouces.zip]() from [Release]()
 
-2. Unarchive `s3_resouces.zip`
+2. Unarchive `s2_resouces.zip`
 
 3. Drop all files from the previously unarchived `svencoop_downloads` into `/Sven Co-op/svencoop_downloads` (and overwrite if any already existed before).
 
