@@ -132,7 +132,6 @@
 
 ![](/s3/gatecrash.png)
 
-
 ## HIT PARADE
 
 * Race
