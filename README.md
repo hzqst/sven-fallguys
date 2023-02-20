@@ -188,13 +188,13 @@
 
 # Installation
 
-1. Download [s3_resouces.zip]() from [Release]()
+1. Download [s3_resouces.zip](https://github.com/hzqst/sven-fallguys/releases/download/s3/s3_resources.zip) from [Release](https://github.com/hzqst/sven-fallguys/releases)
 
 2. Unarchive `s3_resouces.zip`
 
 3. Drop all files from the previously unarchived `svencoop_downloads` into `/Sven Co-op/svencoop_downloads` (and overwrite if any already existed before).
 
-4. Install latest build of *metamod-fallguys* by following the [install instruction](https://github.com/hzqst/metamod-fallguys#installation)
+4. Install latest build of [metamod-fallguys](https://github.com/hzqst/metamod-fallguys) by following the [install instruction](https://github.com/hzqst/metamod-fallguys#installation)
 
 # Credits
 
