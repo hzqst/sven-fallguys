@@ -30,7 +30,7 @@
 
 * All survivors gain 150 poionts!
 
-![](/img/blockparty.png)
+![](/s3/blockparty.png)
 
 ## SLIME CLIMB
 
