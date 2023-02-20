@@ -1,6 +1,6 @@
 # Fall Guys in Sven Co-op - Season 1
 
-# MINI GAMES
+# Minigames
 
 ## Block Party
 
@@ -8,7 +8,7 @@
 
 * Don't fall off!
 
-![](/img/blockparty.png)
+![](/s1/blockparty.png)
 
 ## Slime Climb
 
@@ -24,7 +24,7 @@
 
 * Race to the finish!
 
-![](/img/seesaw.png)
+![](/s1/seesaw.png)
 
 ## Perfect Match
 
@@ -32,7 +32,7 @@
 
 * Match the icons!
 
-![](/img/matchfall.png)
+![](/s1/matchfall.png)
 
 ## Jump Club
 
@@ -40,7 +40,7 @@
 
 * Don't fall off!
 
-![](/img/jumpclub.png)
+![](/s1/jumpclub.png)
 
 ## Roll Out
 
@@ -48,7 +48,7 @@
 
 * Don't fall off!
 
-![](/img/rollout.png)
+![](/s1/rollout.png)
 
 ## Whirligig
 
@@ -56,7 +56,7 @@
 
 * Race to the finish!
 
-![](/img/whirligig.png)
+![](/s1/whirligig.png)
 
 ## Stompin' Ground
 
@@ -66,11 +66,11 @@
 
 * Stay on the platform, bulls will knock you off!
 
-![](/img/stompinground.png)
+![](/s1/stompinground.png)
 
 ## Eliminated and Victory Board
 
-![](/img/end.png)
+![](/s1/end.png)
 
 # Requirement
 

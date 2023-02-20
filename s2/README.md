@@ -14,7 +14,7 @@
 
 * Press E to grab other players.
 
-# MINI GAMES
+# Minigames
 
 ## BLOCK PARTY
 
@@ -24,7 +24,7 @@
 
 * All survivors gain 150 poionts!
 
-![](/img/blockparty.png)
+![](/s2/blockparty.png)
 
 ## SLIME CLIMB
 
@@ -44,7 +44,7 @@
 
 * The champion gains 150 points, the top 50% gain 125 points, otherwise gain 100 points!
 
-![](/img/seesaw.png)
+![](/s2/seesaw.png)
 
 ## PERFECT MATCH
 
@@ -54,7 +54,7 @@
 
 * All survivors gain 150 poionts!
 
-![](/img/matchfall.png)
+![](/s2/matchfall.png)
 
 ## JUMP CLUB
 
@@ -74,7 +74,7 @@
 
 * All survivors gain 150 poionts!
 
-![](/img/rollout.png)
+![](/s2/rollout.png)
 
 ## THE WHIRLYGIG
 
@@ -84,7 +84,7 @@
 
 * The champion gains 150 points, the top 50% gain 125 points, others gain 100 points!
 
-![](/img/whirligig.png)
+![](/s2/whirligig.png)
 
 ## STOMPIN' GROUND
 
@@ -104,7 +104,7 @@
 
 * The champion gains 150 points, the top 50% gain 125 points, others gain 100 points!
 
-![](/img/doordash.png)
+![](/s2/doordash.png)
 
 ## TIP TOE
 
@@ -114,7 +114,7 @@
 
 * The champion gains 150 points, the top 50% gain 125 points, others gain 100 points!
 
-![](/img/tiptoe.png)
+![](/s2/tiptoe.png)
 
 ## GATE CRASH
 
@@ -124,13 +124,51 @@
 
 * The champion gains 150 points, the top 50% gain 125 points, others gain 100 points!
 
-![](/img/gatecrash.png)
+![](/s2/gatecrash.png)
+
+## HIT PARADE
+
+* Race
+
+* Navigate the obstacles and race to the finish line!
+
+* The champion gains 150 points, the top 50% gain 125 points, others gain 100 points!
+
+![](/s3/hitparade.png)
+
+## FRUIT CHUTE
+
+* Race
+
+* Dodge the flying fruits and race up to the finish line!
+
+* The champion gains 150 points, the top 50% gain 125 points, others gain 100 points!
+
+![](/s3/fallfruit.png)
+
+## DIZZY HEIGHTS
+
+* Race
+
+* Navigate the obstacles and race to the finish line!
+
+* The champion gains 150 points, the top 50% gain 125 points, others gain 100 points!
+
+![](/s3/dizzyheights.png)
+
+## FALL BALL
+
+* Teamplay, only available when there are *even* count of players.
+
+* Score goals by getting balls into the opposing team 's goal!
+
+* All players from the winning team gain 150 points!
+
+![](/s3/fallball.png)
 
 ## Eliminated and Victory Board
 
-![](/img/end.png)
-
-![](/img/win.png)
+![](/s3/win.png)
 
 # Requirement
 

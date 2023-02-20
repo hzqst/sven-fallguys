@@ -1,6 +1,6 @@
 # Fall Guys in Sven Co-op - Season 3
 
-## Previous build
+## Previous season
 
 [Season 2](s2/README.md)
 
@@ -20,8 +20,7 @@
 
 * Press E to grab other players.
 
-
-# MINI GAMES
+# Minigames
 
 ## BLOCK PARTY
 
@@ -41,7 +40,7 @@
 
 * The champion gains 150 points, the top 50% gain 125 points, otherwise gain 100 points!
 
-![](/img/slimeclimb.png)
+![](/s3/slimeclimb.png)
 
 ## SEE SAW
 
@@ -51,7 +50,7 @@
 
 * The champion gains 150 points, the top 50% gain 125 points, otherwise gain 100 points!
 
-![](/img/seesaw.png)
+![](/s3/seesaw.png)
 
 ## PERFECT MATCH
 
@@ -61,7 +60,7 @@
 
 * All survivors gain 150 poionts!
 
-![](/img/matchfall.png)
+![](/s3/matchfall.png)
 
 ## JUMP CLUB
 
@@ -71,7 +70,7 @@
 
 * All survivors gain 150 poionts!
 
-![](/img/jumpclub.png)
+![](/s3/jumpclub.png)
 
 ## ROLL OUT
 
@@ -81,7 +80,7 @@
 
 * All survivors gain 150 poionts!
 
-![](/img/rollout.png)
+![](/s3/rollout.png)
 
 ## THE WHIRLYGIG
 
@@ -91,7 +90,7 @@
 
 * The champion gains 150 points, the top 50% gain 125 points, others gain 100 points!
 
-![](/img/whirligig.png)
+![](/s3/whirligig.png)
 
 ## STOMPIN' GROUND
 
@@ -101,7 +100,7 @@
 
 * All survivors gain 150 poionts!
 
-![](/img/rhino.png)
+![](/s3/rhino.png)
 
 ## DOOR DASH
 
@@ -111,7 +110,7 @@
 
 * The champion gains 150 points, the top 50% gain 125 points, others gain 100 points!
 
-![](/img/doordash.png)
+![](/s3/doordash.png)
 
 ## TIP TOE
 
@@ -121,7 +120,7 @@
 
 * The champion gains 150 points, the top 50% gain 125 points, others gain 100 points!
 
-![](/img/tiptoe.png)
+![](/s3/tiptoe.png)
 
 ## GATE CRASH
 
@@ -131,7 +130,53 @@
 
 * The champion gains 150 points, the top 50% gain 125 points, others gain 100 points!
 
-![](/img/gatecrash.png)
+![](/s3/gatecrash.png)
+
+
+## HIT PARADE
+
+* Race
+
+* Navigate the obstacles and race to the finish line!
+
+* The champion gains 150 points, the top 50% gain 125 points, others gain 100 points!
+
+![](/s3/hitparade.png)
+
+## FRUIT CHUTE
+
+* Race
+
+* Dodge the flying fruits and race up to the finish line!
+
+* The champion gains 150 points, the top 50% gain 125 points, others gain 100 points!
+
+![](/s3/fallfruit.png)
+
+## DIZZY HEIGHTS
+
+* Race
+
+* Navigate the obstacles and race to the finish line!
+
+* The champion gains 150 points, the top 50% gain 125 points, others gain 100 points!
+
+![](/s3/dizzyheights.png)
+
+## FALL BALL
+
+* Teamplay, only available when there are *even* count of players.
+
+* Score goals by getting balls into the opposing team 's goal!
+
+* All players from the winning team gain 150 points!
+
+![](/s3/fallball.png)
+
+## Eliminated and Victory Board
+
+![](/s3/win.png)
+
 
 ## Eliminated and Victory Board
 
