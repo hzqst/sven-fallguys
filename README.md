@@ -196,6 +196,8 @@
 
 4. Install latest build of [metamod-fallguys](https://github.com/hzqst/metamod-fallguys) by following the [install instruction](https://github.com/hzqst/metamod-fallguys#installation)
 
+Tutoiral for Windows: https://www.youtube.com/watch?v=r2NRp5TZmUM
+
 # Credits
 
 Textures, models, sprites and sounds credit to [Fall Guys: Ultimate Knockout](https://fallguys.com/)
